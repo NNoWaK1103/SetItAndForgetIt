@@ -2,7 +2,7 @@ package com.openticker.app.data.remote
 
 import com.openticker.app.data.model.*
 import kotlinx.serialization.json.*
-import java.time.Instant
+import java.time.OffsetDateTime
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -37,7 +37,7 @@ object EspnParser {
             val type = s.obj("type") ?: JsonObject(emptyMap())
             val mapped = status(type.str("name"), type.str("state"), type.bool("completed"))
             Game(id, league, team(away), team(home), away.int("score"), home.int("score"), mapped,
-                parsed(c.str("date") ?: e.str("date"), Instant::parse), s.int("period"), s.str("displayClock"),
+                parsed(c.str("date") ?: e.str("date")) { OffsetDateTime.parse(it).toInstant() }, s.int("period"), s.str("displayClock"),
                 type.str("shortDetail") ?: type.str("detail") ?: type.str("description") ?: "Status unavailable")
         }.distinctBy { it.id }
     }

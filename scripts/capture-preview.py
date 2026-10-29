@@ -1,5 +1,6 @@
 """Capture the real APK using live provider data, without injecting sample scores."""
 import json
+import os
 import re
 import subprocess
 import time
@@ -89,6 +90,7 @@ try:
         raise RuntimeError("Android runtime crash detected; inspect runtime.log")
     (OUTPUT / "capture-info.json").write_text(json.dumps({
         "source": "Actual OpenTicker APK running on an Android 15 tablet emulator",
+        "source_commit": os.environ.get("GITHUB_SHA"),
         "resolution": "1280x800", "density_dpi": 160,
         "data": "Live ESPN and Open-Meteo responses, or the app's actual loading/error states",
         "screens": ["weather", "sports-group-a", "sports-group-b"],

@@ -7,6 +7,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ParsingTest {
+    @Test fun `ESPN minute precision timestamps retain scheduled start times`() {
+        val body=fixture("espn-scoreboard.json").replace("2026-10-29T23:00:00Z","2026-10-29T23:00Z")
+        val game=EspnParser.parse(body,League.NFL).first()
+        assertEquals(java.time.Instant.parse("2026-10-29T23:00:00Z"),game.start)
+        assertEquals("7:00 PM",startTime(game,java.time.ZoneId.of("America/New_York")))
+    }
+    @Test fun `ESPN timezone offsets normalize to the correct instant`() {
+        val body=fixture("espn-scoreboard.json").replace("2026-10-29T23:00:00Z","2026-10-30T01:00+02:00")
+        assertEquals(java.time.Instant.parse("2026-10-29T23:00:00Z"),EspnParser.parse(body,League.NHL).first().start)
+    }
     private fun fixture(name: String) = requireNotNull(javaClass.classLoader?.getResource(name)).readText()
     private fun games() = EspnParser.parse(fixture("espn-scoreboard.json"),League.NFL)
     @Test fun `scoreboard handles home and away independent of order`() {
