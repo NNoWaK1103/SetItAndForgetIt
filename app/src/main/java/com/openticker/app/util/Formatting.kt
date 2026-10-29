@@ -14,7 +14,15 @@ fun windDirection(degrees: Double?): String = degrees?.let { listOf("N", "NE", "
 fun filterLeagues(games: List<Game>, enabled: Set<League>) = games.filter { it.league in enabled }
 fun sortedGames(games: List<Game>) = games.sortedWith(compareBy<Game> {
     when (it.status) { GameStatus.LIVE -> 0; GameStatus.UPCOMING -> 1; GameStatus.FINAL -> 2; else -> 3 }
-}.thenBy { it.start })
+}.thenComparator { a,b ->
+    when {
+        a.start==null && b.start==null -> 0
+        a.start==null -> 1
+        b.start==null -> -1
+        a.status==GameStatus.FINAL -> b.start.compareTo(a.start)
+        else -> a.start.compareTo(b.start)
+    }
+})
 fun startTime(game: Game, zone: ZoneId = ZoneId.systemDefault()): String = game.start?.atZone(zone)?.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US)) ?: "Time TBD"
 fun gameStatusText(game: Game): String = when (game.status) {
     GameStatus.LIVE -> game.detail.ifBlank {

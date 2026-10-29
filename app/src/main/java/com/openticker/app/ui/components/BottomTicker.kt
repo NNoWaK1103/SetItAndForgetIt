@@ -21,6 +21,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openticker.app.slideshow.*
+import com.openticker.app.settings.sportsTickerGames
 import com.openticker.app.ui.theme.*
 import com.openticker.app.util.*
 import com.openticker.app.viewmodel.DashboardState
@@ -51,7 +52,9 @@ import java.time.ZoneId
     }
 }
 @Composable private fun SportsTicker(state: DashboardState, animate: Boolean, position: MutableFloatState) {
-    val games = remember(state.scores,state.settings.leagues) { sortedGames(filterLeagues(state.scores.values.flatMap { it.games },state.settings.leagues)) }
+    val games = remember(state.scores,state.settings.leagues,state.settings.sportsGroupA,state.settings.sportsGroupB,state.settings.activeSportsGroup,state.settings.tickerAllLeagues) {
+        sportsTickerGames(state.scores.values.flatMap { it.games },state.settings)
+    }
     val text=remember(games) { if(games.isEmpty()) "OPENTICKER   •   Waiting for scheduled games and score updates" else games.joinToString("     ◆     ") { tickerText(it) } }
     TickerLine(text,animate,position)
 }

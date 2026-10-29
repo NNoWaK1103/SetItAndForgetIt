@@ -14,6 +14,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.openticker.app.slideshow.*
+import com.openticker.app.settings.SportsGroup
 import com.openticker.app.ui.components.*
 import com.openticker.app.ui.theme.*
 import com.openticker.app.viewmodel.*
@@ -39,19 +40,19 @@ import com.openticker.app.viewmodel.*
                 model.clearSearch();settingsOpen=true
             }
             state.settingsError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-            DashboardSlideshow(playback.slide,state,state.settings.animationsEnabled,slideStates,model::manualRefresh,Modifier.weight(1f))
+            DashboardSlideshow(playback.slide,state,state.settings.animationsEnabled,slideStates,model::manualRefresh,model::selectSportsGroup,Modifier.weight(1f))
             BottomTicker(playback.slide,state)
         }
         if(settingsOpen) SettingsDialog(state,model::search,model::saveSettings) { settingsOpen=false;model.clearSearch() }
     }
 }
 @Composable private fun DashboardSlideshow(slide: DashboardSlide, state: DashboardState, animate: Boolean,
-    savedState: androidx.compose.runtime.saveable.SaveableStateHolder, onRefresh: () -> Unit, modifier: Modifier = Modifier) {
+    savedState: androidx.compose.runtime.saveable.SaveableStateHolder, onRefresh: () -> Unit, onSelectGroup: (SportsGroup) -> Unit, modifier: Modifier = Modifier) {
     val content: @Composable (DashboardSlide) -> Unit = { current ->
         savedState.SaveableStateProvider(current.name) {
             when(current) {
                 DashboardSlide.WEATHER -> WeatherDashboard(state,onRefresh)
-                DashboardSlide.SPORTS -> SportsDashboard(state)
+                DashboardSlide.SPORTS -> SportsDashboard(state,onSelectGroup)
             }
         }
     }

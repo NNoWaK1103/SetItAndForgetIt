@@ -10,8 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openticker.app.data.model.*
-import com.openticker.app.settings.AppSettings
-import com.openticker.app.settings.SLIDESHOW_INTERVALS
+import com.openticker.app.settings.*
 import com.openticker.app.slideshow.DashboardSlide
 import com.openticker.app.ui.theme.*
 import com.openticker.app.viewmodel.DashboardState
@@ -39,13 +38,22 @@ import com.openticker.app.viewmodel.DashboardState
             state.searchError?.let { Text(it,color=MaterialTheme.colorScheme.error,fontSize=12.sp) }
             state.searchResults.forEach { location -> TextButton(onClick={draft=draft.copy(location=location)}) { Text(location.label,fontSize=12.sp) } }
             SettingToggle("Celsius (°C)",draft.celsius) {draft=draft.copy(celsius=it)}
-            Text("Sports leagues",color=Mint,fontSize=13.sp)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { League.entries.forEach { league ->
-                Column(horizontalAlignment=Alignment.CenterHorizontally) {
-                    Text(league.name,fontSize=10.sp)
-                    Checkbox(checked=league in draft.leagues,onCheckedChange={ checked -> draft=draft.copy(leagues=if(checked) draft.leagues+league else draft.leagues-league) })
-                }
+            Text("Sports groups",color=Mint,fontSize=13.sp)
+            Text("Select a group now. Group changes leave the slideshow timer running.",color=Muted,fontSize=11.sp)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { SportsGroup.entries.forEach { group ->
+                FilterChip(selected=draft.activeSportsGroup==group,onClick={draft=draft.copy(activeSportsGroup=group)},label={Text("Group ${group.name}")})
             } }
+            SportsGroup.entries.forEach { group ->
+                Text("Group ${group.name} leagues",color=Mint,fontSize=12.sp)
+                LeagueSelection(draft.groupMembers(group)) { members ->
+                    draft=if(group==SportsGroup.A) draft.copy(sportsGroupA=members) else draft.copy(sportsGroupB=members)
+                }
+            }
+            SettingToggle("All five leagues in sports ticker",draft.tickerAllLeagues) {draft=draft.copy(tickerAllLeagues=it)}
+            Text("By default, the score wire follows the selected group. All-five mode also includes disabled feeds in the ticker. Groups switch manually.",color=Muted,fontSize=11.sp)
+            Text("Enabled sports feeds",color=Mint,fontSize=13.sp)
+            Text("Disabled feeds are hidden in both dashboard groups.",color=Muted,fontSize=11.sp)
+            LeagueSelection(draft.leagues) {draft=draft.copy(leagues=it)}
             Text("Live sports refresh",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) { listOf(30,60,120,300).forEach { seconds ->
                 FilterChip(selected=draft.sportsRefreshSeconds==seconds,onClick={draft=draft.copy(sportsRefreshSeconds=seconds)},label={Text(if(seconds<60) "${seconds}s" else "${seconds/60}m",fontSize=11.sp)})
@@ -57,6 +65,14 @@ import com.openticker.app.viewmodel.DashboardState
         } },
         confirmButton={TextButton(onClick={onSave(draft);onDismiss()}) {Text("Save settings")}},
         dismissButton={TextButton(onClick=onDismiss) {Text("Cancel")}})
+}
+@Composable private fun LeagueSelection(selected: Set<League>, onChange: (Set<League>) -> Unit) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { League.entries.forEach { league ->
+        Column(horizontalAlignment=Alignment.CenterHorizontally) {
+            Text(league.name,fontSize=10.sp)
+            Checkbox(checked=league in selected,onCheckedChange={ checked -> onChange(if(checked) selected+league else selected-league) })
+        }
+    } }
 }
 @Composable private fun SettingToggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {

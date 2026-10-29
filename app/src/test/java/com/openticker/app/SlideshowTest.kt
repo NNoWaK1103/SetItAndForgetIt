@@ -1,6 +1,8 @@
 package com.openticker.app
 
 import com.openticker.app.settings.AppSettings
+import com.openticker.app.settings.SportsGroup
+import com.openticker.app.data.model.League
 import com.openticker.app.slideshow.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -85,5 +87,16 @@ class SlideshowTest {
     @Test fun `ticker always shows the other dashboard content`() {
         assertEquals(TickerContent.SPORTS,tickerContent(DashboardSlide.WEATHER))
         assertEquals(TickerContent.WEATHER,tickerContent(DashboardSlide.SPORTS))
+    }
+    @Test fun `group switches and membership edits never reset the slideshow deadline`() = runTest {
+        val c=controller()
+        advanceTimeBy(4_000)
+        c.configure(AppSettings(activeSportsGroup=SportsGroup.B));runCurrent()
+        advanceTimeBy(5_999);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
+        advanceTimeBy(3_000)
+        c.configure(AppSettings(sportsGroupA=setOf(League.NHL),tickerAllLeagues=true));runCurrent()
+        advanceTimeBy(6_999);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
+        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
     }
 }

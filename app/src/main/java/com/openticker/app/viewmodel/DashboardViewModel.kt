@@ -51,7 +51,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { ConnectivityMonitor(application).online.collect { online -> mutable.update { it.copy(online = online) } } }
         viewModelScope.launch {
             combine(active, state.map { it.online }.distinctUntilChanged(),
-                state.map { Triple(it.settingsLoaded, it.settings.location, it.settings.leagues to it.settings.sportsRefreshSeconds) }.distinctUntilChanged()) { visible, online, config ->
+                state.map { Triple(it.settingsLoaded, it.settings.location, it.settings.polledLeagues() to it.settings.sportsRefreshSeconds) }.distinctUntilChanged()) { visible, online, config ->
                 visible && online && config.first
             }.collectLatest { run ->
                 if (run) while (currentCoroutineContext().isActive) { refresh(false); delay(5_000) }
@@ -61,6 +61,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun setActive(value: Boolean) { active.value = value; slideshowController.setForeground(value) }
     fun selectSlide(slide: DashboardSlide) { slideshowController.select(slide) }
     fun toggleSlideshow() { saveSettings(state.value.settings.copy(slideshowPaused = !state.value.settings.slideshowPaused)) }
+    fun selectSportsGroup(group: SportsGroup) { viewModelScope.launch {
+        try { store.selectSportsGroup(group); mutable.update { it.copy(settingsError = null) } }
+        catch(e: CancellationException) { throw e }
+        catch(_: Exception) { mutable.update { it.copy(settingsError = "Could not save sports group. Please try again.") } }
+    } }
     fun manualRefresh() { viewModelScope.launch { refresh(true) } }
     private suspend fun refresh(force: Boolean) {
         if (!state.value.online || !refreshMutex.tryLock()) return
@@ -69,7 +74,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val snapshot = state.value
             val now = Instant.now()
             supervisorScope {
-                val jobs = snapshot.settings.leagues.mapNotNull { league ->
+                val jobs = snapshot.settings.polledLeagues().mapNotNull { league ->
                     val previous = snapshot.scores[league]
                     val seconds = if (previous?.error != null || previous?.games?.any { it.status == GameStatus.LIVE } == true)
                         snapshot.settings.sportsRefreshSeconds else maxOf(180, snapshot.settings.sportsRefreshSeconds)

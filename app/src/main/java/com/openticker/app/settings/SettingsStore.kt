@@ -22,7 +22,11 @@ data class AppSettings(
     val slideshowPaused: Boolean = false,
     val startSlide: DashboardSlide = DashboardSlide.WEATHER,
     val weatherTickerEnabled: Boolean = true,
-    val animationsEnabled: Boolean = true
+    val animationsEnabled: Boolean = true,
+    val sportsGroupA: Set<League> = DEFAULT_GROUP_A,
+    val sportsGroupB: Set<League> = DEFAULT_GROUP_B,
+    val activeSportsGroup: SportsGroup = SportsGroup.A,
+    val tickerAllLeagues: Boolean = false
 )
 val SLIDESHOW_INTERVALS = listOf(5, 10, 15, 30, 60)
 class SettingsStore(private val store: DataStore<Preferences>) {
@@ -38,6 +42,10 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val start = stringPreferencesKey("start_slide")
         val weatherTicker = booleanPreferencesKey("weather_ticker")
         val animations = booleanPreferencesKey("animations")
+        val groupA = stringSetPreferencesKey("sports_group_a")
+        val groupB = stringSetPreferencesKey("sports_group_b")
+        val activeGroup = stringPreferencesKey("active_sports_group")
+        val tickerAll = booleanPreferencesKey("ticker_all_leagues")
     }
     val settings = store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }.map { p ->
         AppSettings(location = Location(p[Keys.name] ?: Location.DEFAULT.name, p[Keys.region] ?: Location.DEFAULT.region,
@@ -50,7 +58,11 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             slideshowPaused = p[Keys.paused] ?: false,
             startSlide = DashboardSlide.entries.find { it.name == p[Keys.start] } ?: DashboardSlide.WEATHER,
             weatherTickerEnabled = p[Keys.weatherTicker] ?: true,
-            animationsEnabled = p[Keys.animations] ?: true)
+            animationsEnabled = p[Keys.animations] ?: true,
+            sportsGroupA = p[Keys.groupA]?.let { names -> League.entries.filter { it.name in names }.toSet() } ?: DEFAULT_GROUP_A,
+            sportsGroupB = p[Keys.groupB]?.let { names -> League.entries.filter { it.name in names }.toSet() } ?: DEFAULT_GROUP_B,
+            activeSportsGroup = SportsGroup.entries.find { it.name == p[Keys.activeGroup] } ?: SportsGroup.A,
+            tickerAllLeagues = p[Keys.tickerAll] ?: false)
     }
     suspend fun save(value: AppSettings) { store.edit { p ->
         p[Keys.name] = value.location.name; p[Keys.region] = value.location.region
@@ -60,5 +72,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         p[Keys.interval] = value.slideshowIntervalSeconds.takeIf { it in SLIDESHOW_INTERVALS } ?: 10
         p[Keys.paused] = value.slideshowPaused; p[Keys.start] = value.startSlide.name
         p[Keys.weatherTicker] = value.weatherTickerEnabled; p[Keys.animations] = value.animationsEnabled
+        p[Keys.groupA] = value.sportsGroupA.map { it.name }.toSet()
+        p[Keys.groupB] = value.sportsGroupB.map { it.name }.toSet()
+        p[Keys.activeGroup] = value.activeSportsGroup.name; p[Keys.tickerAll] = value.tickerAllLeagues
     } }
+    suspend fun selectSportsGroup(group: SportsGroup) { store.edit { it[Keys.activeGroup] = group.name } }
 }
