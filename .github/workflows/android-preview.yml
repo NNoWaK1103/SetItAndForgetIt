@@ -39,12 +39,12 @@ jobs:
       - name: Capture actual tablet screens and slideshow
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis
+          api-level: 30
+          target: default
           arch: x86_64
           profile: pixel_c
           disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -skin 1280x800 -memory 2048 -cores 2 -timezone America/New_York
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -skin 1280x800 -memory 3072 -cores 4 -timezone America/New_York
           script: python3 scripts/capture-preview.py
       - name: Upload screenshots, video and runtime logs
         if: always()

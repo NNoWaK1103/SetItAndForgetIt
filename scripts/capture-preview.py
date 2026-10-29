@@ -19,7 +19,9 @@ def adb(*args, timeout=30):
 def tree():
     try:
         adb("shell", "uiautomator", "dump", "--compressed", "/sdcard/preview-window.xml", timeout=18)
-        return ET.fromstring(adb("shell", "cat", "/sdcard/preview-window.xml"))
+        contents = adb("shell", "cat", "/sdcard/preview-window.xml")
+        (OUTPUT / "last-ui.xml").write_bytes(contents)
+        return ET.fromstring(contents)
     except (subprocess.SubprocessError, ET.ParseError):
         return None
 
@@ -51,6 +53,8 @@ def screenshot(name, required=()):
 
 
 try:
+    # Let Android finish first-boot work before installing and driving the dashboard.
+    time.sleep(15)
     adb("shell", "wm", "size", "1280x800")
     adb("shell", "wm", "density", "160")
     adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
@@ -89,7 +93,7 @@ try:
     if "FATAL EXCEPTION" in logs and PACKAGE in logs:
         raise RuntimeError("Android runtime crash detected; inspect runtime.log")
     (OUTPUT / "capture-info.json").write_text(json.dumps({
-        "source": "Actual OpenTicker APK running on an Android 15 tablet emulator",
+        "source": "Actual OpenTicker APK running on an Android 11 AOSP tablet emulator",
         "source_commit": os.environ.get("GITHUB_SHA"),
         "resolution": "1280x800", "density_dpi": 160,
         "data": "Live ESPN and Open-Meteo responses, or the app's actual loading/error states",
