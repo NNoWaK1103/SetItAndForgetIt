@@ -48,7 +48,6 @@ try:
     adb("shell", "wm", "density", "160")
     adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
     adb("shell", "settings", "put", "system", "user_rotation", "0")
-    adb("shell", "setprop", "persist.sys.timezone", "America/New_York")
     adb("install", "-r", "app/build/outputs/apk/debug/app-debug.apk", timeout=90)
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")

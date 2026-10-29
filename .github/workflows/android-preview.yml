@@ -44,7 +44,7 @@ jobs:
           arch: x86_64
           profile: pixel_c
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -skin 1280x800 -memory 2048 -cores 2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -skin 1280x800 -memory 2048 -cores 2 -timezone America/New_York
           script: python3 scripts/capture-preview.py
       - name: Upload screenshots, video and runtime logs
         if: always()
