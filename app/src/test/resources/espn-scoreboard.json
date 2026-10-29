@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "fixture-live", "date": "2026-10-29T23:00:00Z",
+      "competitions": [{
+        "date": "2026-10-29T23:00:00Z",
+        "competitors": [
+          {"homeAway":"home", "score":"17", "team":{"displayName":"Dallas Cowboys", "abbreviation":"DAL", "logo":"https://example.com/dal.png"}},
+          {"homeAway":"away", "score":"24", "team":{"displayName":"Philadelphia Eagles", "abbreviation":"PHI"}}
+        ],
+        "status":{"period":4, "displayClock":"2:31", "type":{"name":"STATUS_IN_PROGRESS", "state":"in", "completed":false, "shortDetail":"4th 2:31"}}
+      }]
+    },
+    {"id":"fixture-final", "competitions":[{"competitors":[{"homeAway":"away","score":"3","team":{"abbreviation":"A"}},{"homeAway":"home","score":"2","team":{"abbreviation":"B"}}]}], "status":{"type":{"state":"post", "completed":true}}},
+    {"id":"fixture-null", "date":"bad-date", "competitions":[{"competitors":[{"homeAway":"away","score":null,"team":{}},{"homeAway":"home","team":null}],"status":null}]},
+    {"id":"fixture-skip", "competitions":[]},
+    null
+  ]
+}

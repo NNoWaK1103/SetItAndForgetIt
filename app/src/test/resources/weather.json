@@ -1,0 +1,6 @@
+{
+  "timezone":"America/New_York",
+  "current":{"temperature_2m":72.5,"apparent_temperature":71.2,"relative_humidity_2m":65,"wind_speed_10m":8.5,"wind_direction_10m":225,"weather_code":2,"precipitation":0.02,"is_day":1},
+  "hourly":{"time":["2026-10-29T13:00","2026-10-29T14:00","not-a-date"],"temperature_2m":[72.5,null],"weather_code":[2,61],"precipitation_probability":[10]},
+  "daily":{"time":["2026-10-29","2026-10-30"],"temperature_2m_max":[76,68],"temperature_2m_min":[52,null],"weather_code":[2,61],"precipitation_probability_max":[20,85],"uv_index_max":[4.2],"sunrise":["2026-10-29T07:24"],"sunset":["2026-10-29T18:02"]}
+}
