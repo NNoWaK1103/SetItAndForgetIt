@@ -26,6 +26,11 @@ jobs:
       - name: Install SDK
         run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Reuse debug signing identity for tablet updates
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: openticker-debug-signing-v1
       - name: Test, lint, and build APK
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
       - name: Upload test and lint reports

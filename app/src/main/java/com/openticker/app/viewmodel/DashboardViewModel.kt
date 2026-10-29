@@ -74,7 +74,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         try {
                             val games = sports.scoreboard(league)
                             mutable.update { it.copy(scores = it.scores + (league to LeagueState(games, Instant.now()))) }
-                        } catch (e: CancellationException) { throw e }
+                        } catch (e: CancellationException) { sportsAttempts.remove(league); throw e }
                         catch (_: Exception) {
                             mutable.update { it.copy(scores = it.scores + (league to (it.scores[league] ?: LeagueState()).copy(error = "Sports feed unavailable · retrying"))) }
                         }
@@ -87,7 +87,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     try {
                         val forecast = weather.forecast(snapshot.settings.location)
                         mutable.update { if (it.settings.location == snapshot.settings.location) it.copy(weather = forecast, weatherUpdated = Instant.now(), weatherError = null) else it }
-                    } catch (e: CancellationException) { throw e }
+                    } catch (e: CancellationException) { weatherAttempt = null; throw e }
                     catch (_: Exception) { mutable.update { it.copy(weatherError = "Weather feed unavailable · retrying") } }
                 }
                 jobs.joinAll()
@@ -96,6 +96,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     fun saveSettings(settings: AppSettings) { viewModelScope.launch {
         try { store.save(settings); mutable.update { it.copy(settingsError = null) } }
+        catch (e: CancellationException) { throw e }
         catch (_: Exception) { mutable.update { it.copy(settingsError = "Could not save settings. Please try again.") } }
     } }
     fun clearSearch() { searchJob?.cancel(); mutable.update { it.copy(searchResults = emptyList(), searching = false, searchError = null) } }

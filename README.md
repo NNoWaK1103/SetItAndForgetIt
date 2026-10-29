@@ -9,7 +9,7 @@ A native Kotlin / Jetpack Compose sports and weather dashboard for an always-on 
 3. Extract the ZIP, copy `app-debug.apk` to the tablet, and open it. Allow installation from that browser/file manager when Android asks.
 4. Open **OpenTicker**, tap **Settings**, search a city or ZIP, select a result, and save. Default: Hatboro, Pennsylvania.
 
-This is a debug-signed APK for personal installation. Future CI builds use a cached debug signing key when the Gradle cache is available; if Android rejects an update due to a different signing key, uninstall the old debug build first (this clears preferences). A release signing key is intentionally not stored in this repository.
+This is a debug-signed APK for personal installation. CI explicitly caches the debug signing key to allow future APK updates while that cache is available; if the cache expires and Android rejects an update due to a different signing key, uninstall the old debug build first (this clears preferences). A release signing key is intentionally not stored in this repository.
 
 ## Dashboard
 
