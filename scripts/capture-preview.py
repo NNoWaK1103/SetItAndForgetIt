@@ -38,8 +38,14 @@ def tap_text(label, fallback=None):
     return False
 
 
-def screenshot(name):
+def screenshot(name, required=()):
     (OUTPUT / f"{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+    if required:
+        root = tree()
+        visible = {node.get("text") for node in root.iter("node")} if root is not None else set()
+        missing = set(required) - visible
+        if missing:
+            raise RuntimeError(f"{name}: expected dashboard labels not visible: {sorted(missing)}")
     print(f"Captured {name}", flush=True)
 
 
@@ -52,18 +58,21 @@ try:
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
     time.sleep(4)
+    # Android's first immersive launch displays a system help window over the app.
+    tap_text("Got it", fallback=(880, 190))
+    time.sleep(1)
     tap_text("Pause", fallback=(970, 30))
     # Give the public feeds time to return. No fixture data is substituted on failure.
     time.sleep(22)
     tap_text("Weather", fallback=(810, 30))
     time.sleep(2)
-    screenshot("01-weather-with-sports-ticker")
+    screenshot("01-weather-with-sports-ticker", required=("NEXT 12 HOURS",))
     tap_text("Sports", fallback=(885, 30))
     time.sleep(2)
-    screenshot("02-sports-nfl-ncaaf-nhl")
+    screenshot("02-sports-nfl-ncaaf-nhl", required=("NFL", "NCAAF", "NHL"))
     tap_text("NBA / MLB", fallback=(260, 120))
     time.sleep(2)
-    screenshot("03-sports-nba-mlb")
+    screenshot("03-sports-nba-mlb", required=("NBA", "MLB"))
     root = tree()
     if root is not None:
         (OUTPUT / "sports-ui.xml").write_bytes(ET.tostring(root, encoding="utf-8"))
