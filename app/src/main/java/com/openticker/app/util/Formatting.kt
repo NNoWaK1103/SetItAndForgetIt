@@ -2,6 +2,7 @@ package com.openticker.app.util
 
 import com.openticker.app.data.model.*
 import java.time.ZoneId
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -32,4 +33,19 @@ fun tickerText(game: Game): String {
     else "${game.away.abbreviation} @ ${game.home.abbreviation}"
     val live = if (game.status == GameStatus.LIVE) "LIVE · " else ""
     return "${game.league.name}  |  $matchup  |  $live${gameStatusText(game)}"
+}
+
+fun weatherTickerText(weather: Weather?, location: Location, celsius: Boolean, now: LocalDateTime): String {
+    if(weather==null) return "${location.label}  |  Weather unavailable · waiting for an update"
+    val day=weather.days.find { it.date==now.toLocalDate() }
+    fun temp(value: Double?) = temperature(value,celsius)+(if(value!=null) if(celsius) "C" else "F" else "")
+    val details=listOf(location.label,"CURRENT: ${temp(weather.temperatureF)}",
+        weatherCondition(weather.code,weather.isDay).description.uppercase(Locale.US),
+        "FEELS LIKE: ${temp(weather.feelsLikeF)}","HIGH: ${temp(day?.highF)}","LOW: ${temp(day?.lowF)}",
+        "WIND: ${weather.windMph?.let { "${it.roundToInt()} mph ${windDirection(weather.windDirection)}" } ?: "—"}",
+        "HUMIDITY: ${weather.humidity?.let { "$it%" } ?: "—"}","RAIN: ${day?.rain?.let { "$it%" } ?: "—"}")
+    val hourly=weather.hours.filter { !it.time.isBefore(now.withMinute(0).withSecond(0).withNano(0)) }.take(12).map {
+        "${it.time.format(DateTimeFormatter.ofPattern("ha",Locale.US))}: ${temp(it.temperatureF)} ${weatherCondition(it.code).description}"
+    }
+    return (details+hourly).joinToString("  |  ")
 }

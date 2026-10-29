@@ -13,7 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.openticker.app.ui.screens.DashboardScreen
+import com.openticker.app.ui.screens.OpenTickerApp
 import com.openticker.app.ui.theme.OpenTickerTheme
 import com.openticker.app.viewmodel.DashboardViewModel
 import kotlinx.coroutines.awaitCancellation
@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                 if(state.settings.keepAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            OpenTickerTheme { DashboardScreen(state,model::manualRefresh,model::search,model::saveSettings,model::clearSearch) }
+            OpenTickerTheme { OpenTickerApp(model) }
         }
     }
     private fun immersive() {

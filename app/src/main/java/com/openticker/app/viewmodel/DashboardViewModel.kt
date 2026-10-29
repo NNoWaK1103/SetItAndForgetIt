@@ -7,6 +7,7 @@ import com.openticker.app.data.model.*
 import com.openticker.app.data.remote.HttpClient
 import com.openticker.app.data.repository.*
 import com.openticker.app.settings.*
+import com.openticker.app.slideshow.*
 import com.openticker.app.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -30,6 +31,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val mutable = MutableStateFlow(DashboardState())
     val state = mutable.asStateFlow()
     private val active = MutableStateFlow(false)
+    private val slideshowController = SlideshowController(viewModelScope)
+    val slideshow = slideshowController.state
     private val refreshMutex = Mutex()
     private var searchJob: Job? = null
     private val sportsAttempts = mutableMapOf<League, Instant>()
@@ -37,6 +40,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         viewModelScope.launch {
             store.settings.collect { settings ->
+                slideshowController.configure(settings)
                 mutable.update { old ->
                     val changed = old.settings.location != settings.location
                     old.copy(settings = settings, settingsLoaded = true, weather = if (changed) null else old.weather,
@@ -54,7 +58,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
-    fun setActive(value: Boolean) { active.value = value }
+    fun setActive(value: Boolean) { active.value = value; slideshowController.setForeground(value) }
+    fun selectSlide(slide: DashboardSlide) { slideshowController.select(slide) }
+    fun toggleSlideshow() { saveSettings(state.value.settings.copy(slideshowPaused = !state.value.settings.slideshowPaused)) }
     fun manualRefresh() { viewModelScope.launch { refresh(true) } }
     private suspend fun refresh(force: Boolean) {
         if (!state.value.online || !refreshMutex.tryLock()) return

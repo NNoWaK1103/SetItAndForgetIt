@@ -20,9 +20,6 @@ import coil.compose.AsyncImage
 import com.openticker.app.data.model.*
 import com.openticker.app.ui.theme.*
 import com.openticker.app.util.*
-import com.openticker.app.viewmodel.LeagueState
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable fun SectionLabel(text: String, trailing: String? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -38,27 +35,6 @@ import java.time.format.DateTimeFormatter
                 shape = RoundedCornerShape(10.dp), modifier = Modifier.background(if (active) Mint.copy(alpha=.1f) else Color.Transparent, RoundedCornerShape(10.dp))) {
                 Text(league.name, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
-        }
-    }
-}
-@Composable fun SportsPanel(enabled: Set<League>, scores: Map<League, LeagueState>, online: Boolean, modifier: Modifier = Modifier) {
-    var selectedName by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(League.NFL.name) }
-    val selected = enabled.find { it.name == selectedName } ?: enabled.minByOrNull { it.ordinal }
-    val feed = selected?.let { scores[it] }
-    Column(modifier.background(Brush.verticalGradient(listOf(SportsBackground, Color(0xFF151B25)))).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionLabel("THE SCOREBOARD", "TODAY · EASTERN")
-        LeagueTabs(enabled, selected) { selectedName = it.name }
-        val warning = if (!online) "Offline · showing last received scores" else feed?.error
-        warning?.let { Text(it, color = Color(0xFFFFCA82), fontSize = 11.sp) }
-        feed?.updated?.let { Text("Updated ${it.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm:ss a"))}", color = Muted, fontSize = 10.sp) }
-        if (selected == null) {
-            EmptyPanel("Your leagues, your dashboard", "Enable a league in Settings to see scores.")
-        } else if (feed == null || (feed.updated == null && feed.error == null)) {
-            EmptyPanel(if (online) "Loading ${selected.name} scores" else "Waiting for a connection", "Live scores will appear when the sports feed is available.")
-        } else if (feed.games.isEmpty()) {
-            EmptyPanel(if (feed.updated == null) "Scores unavailable" else "No ${selected.name} games today", if (feed.updated == null) "The feed will retry automatically." else "Choose another league. The scoreboard checks for new games automatically.")
-        } else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 10.dp)) {
-            items(sortedGames(feed.games), key = { it.id }) { GameCard(it) }
         }
     }
 }
@@ -93,16 +69,5 @@ import java.time.format.DateTimeFormatter
             Text(team.abbreviation, color=Muted, fontSize=10.sp)
         }
         Text(if(status == GameStatus.LIVE || status == GameStatus.FINAL) score?.toString() ?: "—" else "—", fontSize=25.sp, fontWeight=FontWeight.SemiBold)
-    }
-}
-@OptIn(ExperimentalFoundationApi::class)
-@Composable fun SportsTicker(games: List<Game>, enabled: Set<League>) {
-    val filtered = remember(games, enabled) { sortedGames(filterLeagues(games, enabled)) }
-    val text = remember(filtered) { if (filtered.isEmpty()) "OPENTICKER   •   Waiting for scheduled games and score updates" else filtered.joinToString("     ◆     ") { tickerText(it) } }
-    Row(Modifier.fillMaxWidth().height(42.dp).background(Color(0xFF080C13)), verticalAlignment=Alignment.CenterVertically) {
-        Text("  SCORE WIRE  ", color=SportsBackground, fontSize=10.sp, fontWeight=FontWeight.ExtraBold,
-            modifier=Modifier.fillMaxHeight().background(Mint).wrapContentHeight(Alignment.CenterVertically))
-        Text(List(3) { text }.joinToString("     ◆     "), maxLines=1, softWrap=false, color=Color(0xFFDCE5F3), fontSize=12.sp,
-            modifier=Modifier.weight(1f).padding(horizontal=12.dp).basicMarquee(iterations=Int.MAX_VALUE, repeatDelayMillis=0, initialDelayMillis=0, spacing=MarqueeSpacing(48.dp), velocity=38.dp))
     }
 }
