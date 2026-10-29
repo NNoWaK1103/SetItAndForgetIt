@@ -30,7 +30,7 @@ def tap_text(label, fallback=None):
     root = tree()
     if root is not None:
         for node in root.iter("node"):
-            if node.get("text") == label:
+            if node.get("text", "").casefold() == label.casefold():
                 numbers = [int(n) for n in re.findall(r"\d+", node.get("bounds", ""))]
                 if len(numbers) == 4:
                     x1, y1, x2, y2 = numbers
@@ -59,6 +59,7 @@ try:
     adb("shell", "wm", "density", "160")
     adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
     adb("shell", "settings", "put", "system", "user_rotation", "0")
+    adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
     adb("install", "-r", "app/build/outputs/apk/debug/app-debug.apk", timeout=90)
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
