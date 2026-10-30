@@ -9,15 +9,18 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-enum class DashboardSlide { WEATHER, SPORTS;
-    fun next() = if (this == WEATHER) SPORTS else WEATHER
+enum class DashboardSlide(val label: String) { WEATHER("Weather"), SPORTS("Sports"), STOCKS("Stocks");
+    fun next(enabled: List<DashboardSlide> = entries.toList()): DashboardSlide =
+        if (enabled.isEmpty()) this else enabled[(enabled.indexOf(this) + 1).mod(enabled.size)]
 }
-enum class TickerContent { SPORTS, WEATHER }
+enum class TickerContent { SPORTS, WEATHER, STOCKS }
 fun tickerContent(slide: DashboardSlide) = when (slide) {
     DashboardSlide.WEATHER -> TickerContent.SPORTS
     DashboardSlide.SPORTS -> TickerContent.WEATHER
+    DashboardSlide.STOCKS -> TickerContent.STOCKS
 }
-data class SlideshowState(val slide: DashboardSlide = DashboardSlide.WEATHER, val playing: Boolean = false)
+data class SlideshowState(val slide: DashboardSlide = DashboardSlide.WEATHER, val playing: Boolean = false,
+    val enabledScreens: List<DashboardSlide> = DashboardSlide.entries.toList())
 
 /** One timer job, independent of data polling. Pauses retain the unexpired display time. */
 class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 }) {
@@ -38,25 +41,28 @@ class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Lo
             var intervalMillis = 10_000L
             var remainingMillis = intervalMillis
             var slide = DashboardSlide.WEATHER
+            var enabled = DashboardSlide.entries.toList()
             while (isActive) {
-                val running = configured && foreground && !paused
+                val running = configured && foreground && !paused && enabled.size > 1
                 val started = nowMillis()
                 val event = if (running) withTimeoutOrNull(remainingMillis) { events.receive() } else events.receive()
                 if (running) remainingMillis = (remainingMillis - (nowMillis() - started).coerceAtLeast(0)).coerceAtLeast(1)
                 when (event) {
-                    null -> { slide = slide.next(); remainingMillis = intervalMillis }
+                    null -> { slide = slide.next(enabled); remainingMillis = intervalMillis }
                     is Event.Configure -> {
                         val newInterval = event.settings.slideshowIntervalSeconds.coerceIn(5, 60) * 1_000L
                         if (!configured) slide = event.settings.startSlide
+                        enabled = event.settings.enabledScreens.distinct()
+                        if (enabled.isNotEmpty() && slide !in enabled) { slide = enabled.first(); remainingMillis = newInterval }
                         if (!configured || intervalMillis != newInterval) remainingMillis = newInterval
                         intervalMillis = newInterval
                         paused = event.settings.slideshowPaused
                         configured = true
                     }
                     is Event.Foreground -> foreground = event.visible
-                    is Event.Select -> { slide = event.slide; remainingMillis = intervalMillis }
+                    is Event.Select -> if (event.slide in enabled) { slide = event.slide; remainingMillis = intervalMillis }
                 }
-                mutable.value = SlideshowState(slide, configured && foreground && !paused)
+                mutable.value = SlideshowState(slide, configured && foreground && !paused && enabled.size > 1, enabled)
             }
         }
     }

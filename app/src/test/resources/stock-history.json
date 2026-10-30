@@ -1,0 +1,8 @@
+{"freshness":"DELAYED","updated":"2026-10-29T14:00:00Z","points":[
+  {"time":"2026-10-29T13:40:00Z","close":410.25},
+  {"time":"2026-10-29T13:30:00Z","close":400.0},
+  {"time":"2026-10-29T13:35:00Z","close":null},
+  {"time":"invalid","close":402.0},
+  {"time":"2026-10-29T13:40:00Z","close":410.25},
+  {"time":"2026-10-29T13:45:00Z","close":-1.0}
+]}

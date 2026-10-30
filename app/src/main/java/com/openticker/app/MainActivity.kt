@@ -16,18 +16,21 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.openticker.app.ui.screens.OpenTickerApp
 import com.openticker.app.ui.theme.OpenTickerTheme
 import com.openticker.app.viewmodel.DashboardViewModel
+import com.openticker.app.viewmodel.StockMarketViewModel
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val model: DashboardViewModel by viewModels()
+    private val stocks: StockMarketViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         immersive()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 model.setActive(true)
-                try { awaitCancellation() } finally { model.setActive(false) }
+                stocks.setActive(true)
+                try { awaitCancellation() } finally { model.setActive(false); stocks.setActive(false) }
             }
         }
         setContent {
@@ -36,7 +39,7 @@ class MainActivity : ComponentActivity() {
                 if(state.settings.keepAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            OpenTickerTheme { OpenTickerApp(model) }
+            OpenTickerTheme { OpenTickerApp(model,stocks) }
         }
     }
     private fun immersive() {

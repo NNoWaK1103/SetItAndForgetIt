@@ -23,9 +23,9 @@ class SlideshowTest {
         advanceTimeBy(1);runCurrent()
         assertEquals(DashboardSlide.SPORTS,controller.state.value.slide)
         advanceTimeBy(10_000);runCurrent()
-        assertEquals(DashboardSlide.WEATHER,controller.state.value.slide)
+        assertEquals(DashboardSlide.STOCKS,controller.state.value.slide)
         advanceTimeBy(10_000);runCurrent()
-        assertEquals(DashboardSlide.SPORTS,controller.state.value.slide)
+        assertEquals(DashboardSlide.WEATHER,controller.state.value.slide)
     }
     @Test fun `background pauses remaining interval and resume continues it`() = runTest {
         val c=controller()
@@ -49,7 +49,7 @@ class SlideshowTest {
         advanceTimeBy(9_000);c.select(DashboardSlide.SPORTS);runCurrent()
         assertEquals(DashboardSlide.SPORTS,c.state.value.slide);assertTrue(c.state.value.playing)
         advanceTimeBy(9_999);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
-        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
     }
     @Test fun `manual selection works while paused`() = runTest {
         val c=controller(AppSettings(slideshowPaused=true))
@@ -68,13 +68,13 @@ class SlideshowTest {
         assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
         advanceTimeBy(5_000);c.configure(AppSettings(startSlide=DashboardSlide.WEATHER,celsius=true));runCurrent()
         assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
-        advanceTimeBy(5_000);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(5_000);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
     }
     @Test fun `repeated foreground events do not create duplicate timers`() = runTest {
         val c=controller()
         repeat(12) { c.setForeground(true) };runCurrent()
         advanceTimeBy(10_000);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
-        advanceTimeBy(10_000);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(10_000);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
     }
     @Test fun `timer waits for persisted settings to load`() = runTest {
         val c=SlideshowController(backgroundScope) { testScheduler.currentTime }
@@ -82,11 +82,12 @@ class SlideshowTest {
         assertFalse(c.state.value.playing)
         c.configure(AppSettings(startSlide=DashboardSlide.SPORTS));runCurrent()
         assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
-        advanceTimeBy(10_000);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(10_000);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
     }
     @Test fun `ticker always shows the other dashboard content`() {
         assertEquals(TickerContent.SPORTS,tickerContent(DashboardSlide.WEATHER))
         assertEquals(TickerContent.WEATHER,tickerContent(DashboardSlide.SPORTS))
+        assertEquals(TickerContent.STOCKS,tickerContent(DashboardSlide.STOCKS))
     }
     @Test fun `group switches and membership edits never reset the slideshow deadline`() = runTest {
         val c=controller()
@@ -97,6 +98,31 @@ class SlideshowTest {
         advanceTimeBy(3_000)
         c.configure(AppSettings(sportsGroupA=setOf(League.NHL),tickerAllLeagues=true));runCurrent()
         advanceTimeBy(6_999);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
-        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
+    }
+    @Test fun `configured ordered list repeats and disabled screens are skipped`() = runTest {
+        val screens=listOf(DashboardSlide.STOCKS,DashboardSlide.WEATHER)
+        val c=controller(AppSettings(enabledScreens=screens,startSlide=DashboardSlide.STOCKS))
+        repeat(4) {
+            advanceTimeBy(9_999);runCurrent();assertEquals(screens[it%2],c.state.value.slide)
+            advanceTimeBy(1);runCurrent();assertEquals(screens[(it+1)%2],c.state.value.slide)
+        }
+        c.select(DashboardSlide.SPORTS);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
+    }
+    @Test fun `disabling current screen selects first enabled and empty slideshow stops`() = runTest {
+        val c=controller()
+        c.configure(AppSettings(enabledScreens=listOf(DashboardSlide.STOCKS)));runCurrent()
+        assertEquals(DashboardSlide.STOCKS,c.state.value.slide);assertFalse(c.state.value.playing)
+        advanceTimeBy(60_000);runCurrent();assertEquals(DashboardSlide.STOCKS,c.state.value.slide)
+        c.configure(AppSettings(enabledScreens=emptyList()));runCurrent();assertFalse(c.state.value.playing)
+        c.configure(AppSettings());runCurrent();advanceTimeBy(10_000);runCurrent()
+        assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+    }
+    @Test fun `each individual screen can be disabled`() = runTest {
+        DashboardSlide.entries.forEach { disabled ->
+            val screens=DashboardSlide.entries.filter {it!=disabled}
+            val c=controller(AppSettings(enabledScreens=screens))
+            repeat(6) {assertTrue(c.state.value.slide in screens);advanceTimeBy(10_000);runCurrent()}
+        }
     }
 }

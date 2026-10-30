@@ -19,7 +19,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable fun DashboardHeader(online: Boolean, healthy: Boolean, slide: DashboardSlide, paused: Boolean,
-    onSelect: (DashboardSlide) -> Unit, onTogglePlayback: () -> Unit, onSettings: () -> Unit) {
+    onSelect: (DashboardSlide) -> Unit, onTogglePlayback: () -> Unit,
+    enabledScreens: List<DashboardSlide> = DashboardSlide.entries.toList(), onSettings: () -> Unit) {
     val now by produceState(ZonedDateTime.now()) { while(true) { value = ZonedDateTime.now(); delay(1000) } }
     Row(Modifier.fillMaxWidth().height(60.dp).background(Color(0xFF0B1019)).padding(horizontal=16.dp),
         verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -28,9 +29,9 @@ import java.util.Locale
         }
         Text("OpenTicker",fontSize=19.sp,fontWeight=FontWeight.SemiBold,letterSpacing=(-.5).sp)
         Spacer(Modifier.weight(1f))
-        DashboardSlide.entries.forEach { target ->
+        enabledScreens.forEach { target ->
             TextButton(onClick={onSelect(target)},contentPadding=PaddingValues(horizontal=8.dp)) {
-                Text(if(target==DashboardSlide.WEATHER) "Weather" else "Sports",color=if(target==slide) Mint else Muted,fontSize=12.sp,fontWeight=FontWeight.SemiBold)
+                Text(target.label,color=if(target==slide) Mint else Muted,fontSize=12.sp,fontWeight=FontWeight.SemiBold)
             }
         }
         TextButton(onClick=onTogglePlayback,contentPadding=PaddingValues(horizontal=8.dp)) { Text(if(paused) "Resume" else "Pause",fontSize=12.sp) }

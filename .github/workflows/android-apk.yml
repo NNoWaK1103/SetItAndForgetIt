@@ -26,6 +26,11 @@ jobs:
       - name: Install SDK
         run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test market-data adapter (offline fixtures)
+        run: node --test server/market-proxy.test.mjs
       - name: Reuse debug signing identity for tablet updates
         uses: actions/cache@v4
         with:
@@ -46,3 +51,5 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 90
+      - name: Record APK checksum
+        run: sha256sum app/build/outputs/apk/debug/app-debug.apk >> "$GITHUB_STEP_SUMMARY"

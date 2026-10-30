@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -25,24 +26,27 @@ import com.openticker.app.settings.sportsTickerGames
 import com.openticker.app.ui.theme.*
 import com.openticker.app.util.*
 import com.openticker.app.viewmodel.DashboardState
+import com.openticker.app.data.repository.StockMarketUiState
 import kotlinx.coroutines.isActive
 import java.time.LocalDateTime
 import java.time.ZoneId
 
 /** Stationary container outside DashboardSlideshow. Only its contents crossfade. */
-@Composable fun BottomTicker(slide: DashboardSlide, state: DashboardState) {
+@Composable fun BottomTicker(slide: DashboardSlide, state: DashboardState, stocks: StockMarketUiState) {
     val sportsPosition = remember { mutableFloatStateOf(0f) }
     val weatherPosition = remember { mutableFloatStateOf(0f) }
+    val stockPosition = remember { mutableFloatStateOf(0f) }
     val type = tickerContent(slide)
     val content: @Composable (TickerContent) -> Unit = { selected ->
-        val enabled = if(selected==TickerContent.SPORTS) state.settings.tickerEnabled else state.settings.weatherTickerEnabled
+        val enabled = when(selected) { TickerContent.SPORTS -> state.settings.tickerEnabled; TickerContent.WEATHER -> state.settings.weatherTickerEnabled; TickerContent.STOCKS -> state.settings.stocks.tickerEnabled }
         Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically) {
-            Text(if(selected==TickerContent.SPORTS) "SCORE WIRE" else "WEATHER WIRE",color=SportsBackground,fontSize=11.sp,fontWeight=FontWeight.ExtraBold,
+            Text(when(selected) { TickerContent.SPORTS -> "SCORE WIRE"; TickerContent.WEATHER -> "WEATHER WIRE"; TickerContent.STOCKS -> "MARKET WIRE" },color=SportsBackground,fontSize=11.sp,fontWeight=FontWeight.ExtraBold,
                 modifier=Modifier.width(126.dp).fillMaxHeight().background(if(selected==TickerContent.SPORTS) Mint else Ice).wrapContentSize(Alignment.Center))
             Box(Modifier.weight(1f).fillMaxHeight().padding(horizontal=16.dp),contentAlignment=Alignment.CenterStart) {
-                if(!enabled) Text("${if(selected==TickerContent.SPORTS) "Sports" else "Weather"} ticker disabled",color=Muted,fontSize=14.sp)
+                if(!enabled) Text("${selected.name.lowercase().replaceFirstChar { it.uppercase() }} ticker disabled",color=Muted,fontSize=14.sp)
                 else if(selected==TickerContent.SPORTS) SportsTicker(state,state.settings.animationsEnabled,sportsPosition)
-                else WeatherTicker(state,state.settings.animationsEnabled,weatherPosition)
+                else if(selected==TickerContent.WEATHER) WeatherTicker(state,state.settings.animationsEnabled,weatherPosition)
+                else StockTicker(stocks,state.settings.stocks,state.settings.animationsEnabled,stockPosition)
             }
         }
     }
@@ -56,18 +60,18 @@ import java.time.ZoneId
         sportsTickerGames(state.scores.values.flatMap { it.games },state.settings)
     }
     val text=remember(games) { if(games.isEmpty()) "OPENTICKER   •   Waiting for scheduled games and score updates" else games.joinToString("     ◆     ") { tickerText(it) } }
-    TickerLine(text,animate,position)
+    TickerLine(AnnotatedString(text),animate,position)
 }
 @Composable private fun WeatherTicker(state: DashboardState, animate: Boolean, position: MutableFloatState) {
     val text=remember(state.weather,state.settings.location,state.settings.celsius,state.weatherUpdated) {
         val zone=runCatching { ZoneId.of(state.weather?.timezone ?: "UTC") }.getOrDefault(ZoneId.of("UTC"))
         weatherTickerText(state.weather,state.settings.location,state.settings.celsius,LocalDateTime.now(zone))
     }
-    TickerLine(text,animate,position)
+    TickerLine(AnnotatedString(text),animate,position)
 }
 
 /** Measured once per update; frame changes invalidate drawing, not composition or text layout. */
-@Composable private fun TickerLine(message: String, animate: Boolean, position: MutableFloatState) {
+@Composable internal fun TickerLine(message: AnnotatedString, animate: Boolean, position: MutableFloatState) {
     val style=TextStyle(fontSize=16.sp,color=Color(0xFFDCE5F3),fontWeight=FontWeight.Medium)
     if(!animate) {
         Text(message,style=style,maxLines=1,softWrap=false,modifier=Modifier.horizontalScroll(rememberScrollState()))
@@ -86,7 +90,7 @@ import java.time.ZoneId
             previous=frame
         }
     }
-    Canvas(Modifier.fillMaxSize().clipToBounds().semantics { contentDescription=message }) {
+    Canvas(Modifier.fillMaxSize().clipToBounds().semantics { contentDescription=message.text }) {
         var x=-(position.floatValue%cycle)
         val y=(size.height-layout.size.height)/2f
         while(x<size.width) { drawText(layout,topLeft=Offset(x,y)); x+=cycle }

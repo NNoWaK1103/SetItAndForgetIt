@@ -1,0 +1,12 @@
+{
+  "provider": "Fixture provider",
+  "session": "OPEN",
+  "statusUpdated": "2026-10-29T14:00:00Z",
+  "refreshAfterSeconds": 60,
+  "quotes": [
+    {"symbol":"HD","price":410.25,"previousClose":400.0,"high":412.0,"low":398.0,"volume":1234567,"updated":"2026-10-29T13:45:00Z","freshness":"DELAYED","delayMinutes":15,"exchange":"NYSE"},
+    {"symbol":"AAPL","price":195.0,"previousClose":200.0,"updated":"2026-10-28T20:00:00Z","freshness":"PREVIOUS_CLOSE"},
+    {"symbol":"MSFT","price":null,"freshness":"UNAVAILABLE"},
+    {"symbol":"BRK.B","price":500.0,"previousClose":500.0,"updated":"2026-10-29T14:00:00Z","freshness":"REALTIME"}
+  ]
+}

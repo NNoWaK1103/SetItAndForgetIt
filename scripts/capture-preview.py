@@ -82,12 +82,16 @@ try:
     root = tree()
     if root is not None:
         (OUTPUT / "sports-ui.xml").write_bytes(ET.tostring(root, encoding="utf-8"))
-    # Restore defaults, then record an automatic weather/sports/weather cycle.
+    tap_text("Stocks")
+    time.sleep(2)
+    screenshot("04-stocks-unconfigured", required=("The Home Depot", "COMPANY WATCHLIST", "MARKET WIRE"))
+    # Restore defaults, then record a complete weather/sports/stocks/weather cycle.
+    tap_text("Sports")
     tap_text("NFL / NCAAF / NHL", fallback=(100, 120))
     tap_text("Weather", fallback=(810, 30))
     tap_text("Resume")
-    video = subprocess.Popen(["adb", "shell", "screenrecord", "--time-limit", "25", "--bit-rate", "2000000", "--size", "1280x800", "/sdcard/openticker-preview.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    video.wait(timeout=40)
+    video = subprocess.Popen(["adb", "shell", "screenrecord", "--time-limit", "35", "--bit-rate", "2000000", "--size", "1280x800", "/sdcard/openticker-preview.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    video.wait(timeout=50)
     adb("pull", "/sdcard/openticker-preview.mp4", str(OUTPUT / "slideshow.mp4"), timeout=40)
     logs = adb("logcat", "-d", "-v", "threadtime").decode("utf-8", errors="replace")
     (OUTPUT / "runtime.log").write_text(logs, encoding="utf-8")
@@ -97,8 +101,8 @@ try:
         "source": "Actual OpenTicker APK running on an Android 11 AOSP tablet emulator",
         "source_commit": os.environ.get("GITHUB_SHA"),
         "resolution": "1280x800", "density_dpi": 160,
-        "data": "Live ESPN and Open-Meteo responses, or the app's actual loading/error states",
-        "screens": ["weather", "sports-group-a", "sports-group-b"],
+        "data": "ESPN and Open-Meteo responses, or actual loading/error states. Stocks unconfigured: no mock prices.",
+        "screens": ["weather", "sports-group-a", "sports-group-b", "stocks-unconfigured"],
     }, indent=2), encoding="utf-8")
 finally:
     try:
