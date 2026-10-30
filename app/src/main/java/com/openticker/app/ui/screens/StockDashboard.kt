@@ -129,7 +129,7 @@ private fun direction(quote: StockQuote?) = when {
         return
     }
     Column(modifier) {
-        Text(listOfNotNull(error ?: history?.message,"${history?.freshness?.label} · ${stockTime(points.first().time)} – ${stockTime(points.last().time)}").joinToString(" · "),color=StockMuted,fontSize=9.sp,maxLines=2)
+        Text(listOfNotNull(error ?: history?.message,history?.feedLabel,"${history?.freshness?.label} · ${stockTime(points.first().time)} – ${stockTime(points.last().time)}").joinToString(" · "),color=StockMuted,fontSize=9.sp,maxLines=2)
         val pathPoints = remember(points) {
             val min = points.minOf { it.close }; val max = points.maxOf { it.close }
             val span = (max-min).takeIf { it > 0 } ?: (min*.01).coerceAtLeast(1.0)

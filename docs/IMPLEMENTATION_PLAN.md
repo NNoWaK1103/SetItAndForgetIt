@@ -33,7 +33,7 @@
 ## Stock data boundary
 
 - `StockRepository` / `StockDataSource` separate the provider from stock models, `StockMarketUiState`, `StockMarketViewModel` and Compose presentation. Each module caches independently; slide transitions never initiate requests.
-- Keep private keys on an operator-managed HTTPS proxy. Ship a documented Massive reference adapter with a global request queue, coalescing, quota control and backoff. Leave prices unavailable until a licensed feed is configured.
+- Keep private keys on an operator-managed HTTPS proxy. Default to the user-selected Alpaca provider with explicit IEX/SIP coverage, batch snapshots, paginated history and the provider clock. Retain the alternative Massive adapter, shared request queue, coalescing, quota control and backoff. Leave prices unavailable until configured.
 - Label quote freshness and original timestamps, preserve valid values on failures, and expire cached provider market status. Use the provider's NYSE session status for holidays and early closes, with America/New_York dates for US history requests.
 - Persist screen order, featured symbol, watchlist/categories, chart range, indices, rotation, ticker and refresh settings. Keep HD visible if the featured symbol changes. Describe Fortune 500 as a revenue ranking without asserting current membership or ranks.
 - Test quotes, missing data, daily changes, chart mapping/caches, stale retention, backoff, session status, ticker formatting, preferences and slideshow timing using deterministic fixtures. Add offline server tests to the APK workflow and the stock screen to the emulator capture workflow. See [market data setup](STOCK_DATA.md).

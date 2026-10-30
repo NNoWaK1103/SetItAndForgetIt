@@ -17,10 +17,13 @@ fun stockDollarChange(value: Double?): String = value?.let {
 } ?: "—"
 fun stockTime(time: Instant?): String = time?.atZone(ZoneId.of("America/New_York"))
     ?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a 'ET'", Locale.US)) ?: "Time unavailable"
-fun stockFreshness(quote: StockQuote?): String = when (quote?.freshness) {
-    QuoteFreshness.DELAYED -> quote.delayMinutes?.let { "Delayed ${it}m" } ?: "Delayed"
-    null -> "Unavailable"
-    else -> quote.freshness.label
+fun stockFreshness(quote: StockQuote?): String {
+    val freshness = when (quote?.freshness) {
+        QuoteFreshness.DELAYED -> quote.delayMinutes?.let { "Delayed ${it}m" } ?: "Delayed"
+        null -> "Unavailable"
+        else -> quote.freshness.label
+    }
+    return listOfNotNull(freshness,quote?.feedLabel?.takeIf { it.isNotBlank() }).joinToString(" · ")
 }
 fun stockTickerText(symbol: String, quote: StockQuote?, stale: Boolean = false): String =
     if (quote?.price == null) "$symbol  Unavailable" else

@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import java.time.ZoneId
 
 data class StockMarketUiState(
     val quotes: Map<String, StockQuote> = emptyMap(), val session: MarketSession = MarketSession.UNKNOWN,
@@ -68,7 +69,12 @@ class CachedStockRepository(private val source: StockDataSource) : StockReposito
         if (now >= (historyDue[key] ?: Instant.MIN)) {
             try {
                 val history = source.history(baseUrl, key.first, key.second)
-                state = state.copy(histories = state.histories + (key to history), historyErrors = state.historyErrors - key)
+                val previous = state.histories[key]
+                val sameDay = settings.range != ChartRange.DAY || previous?.points?.lastOrNull()?.time
+                    ?.atZone(ZoneId.of("America/New_York"))?.toLocalDate() == now.atZone(ZoneId.of("America/New_York")).toLocalDate()
+                val displayed = if(history.pending && history.points.isEmpty() && previous!=null && sameDay)
+                    previous.copy(message=history.message ?: "Chart refresh pending · showing retained history",pending=true) else history
+                state = state.copy(histories = state.histories + (key to displayed), historyErrors = state.historyErrors - key)
                 historyFailures.remove(key)
                 historyDue[key] = now.plusSeconds(if(history.pending) 60 else if (settings.range == ChartRange.DAY) maxOf(300, settings.refreshSeconds).toLong() else 21600)
             } catch (e: CancellationException) { throw e }

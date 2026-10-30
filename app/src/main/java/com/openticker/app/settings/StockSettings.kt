@@ -24,7 +24,8 @@ data class StockSettings(
         proxyUrl = proxyUrl.trim().takeIf { it.isEmpty() || validStockProxy(it) } ?: "")
 }
 fun validStockProxy(value: String): Boolean = value.toHttpUrlOrNull()?.let {
-    it.isHttps && it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null
+    it.isHttps && it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null &&
+        it.host !in setOf("api.alpaca.markets", "paper-api.alpaca.markets", "data.alpaca.markets", "api.massive.com")
 } == true
 
 fun stockGridPage(settings: StockSettings, appearance: Int, size: Int = 8): Pair<List<String>, Int> {

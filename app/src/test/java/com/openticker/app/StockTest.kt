@@ -69,16 +69,26 @@ class StockTest {
         assertEquals("BRK.B",normalizeStockSymbol(" brk.b "));assertNull(normalizeStockSymbol("HD&apikey=bad"))
         assertTrue(validStockProxy("https://example.com/market"));assertFalse(validStockProxy("http://example.com"))
         assertFalse(validStockProxy("https://user:secret@example.com"));assertFalse(validStockProxy("https://example.com?key=secret"))
+        assertFalse(validStockProxy("https://api.alpaca.markets"));assertFalse(validStockProxy("https://data.alpaca.markets"))
+        assertFalse(validStockProxy("https://paper-api.alpaca.markets"))
+    }
+    @Test fun `Alpaca feed coverage survives quote and chart parsing and ticker formatting`() {
+        val quote=StockParser.snapshot("""{"quotes":[{"symbol":"HD","price":410.25,"previousClose":400,"updated":"2026-10-29T13:59:59Z","freshness":"REALTIME","feedLabel":"IEX only"}]}""").quotes.getValue("HD")
+        assertEquals("Real-time · IEX only",stockFreshness(quote))
+        assertTrue(stockTickerText("HD",quote).contains("IEX only"))
+        assertEquals("Delayed 15m · SIP",stockFreshness(quote.copy(freshness=QuoteFreshness.DELAYED,delayMinutes=15,feedLabel="SIP")))
+        val chart=StockParser.history("""{"points":[{"time":"2026-10-29T13:30:00Z","close":400}],"freshness":"REALTIME","feedLabel":"IEX only"}""")
+        assertEquals("IEX only",chart.feedLabel)
     }
     private inner class Source : StockDataSource {
-        var snapshotCalls=0;var historyCalls=0;var fail=false;var missing=false;var session=MarketSession.OPEN;var cancel=false;var quota=60
+        var snapshotCalls=0;var historyCalls=0;var fail=false;var missing=false;var session=MarketSession.OPEN;var cancel=false;var quota=60;var historyPending=false
         override suspend fun snapshot(baseUrl: String,symbols: List<String>,indices: Set<MarketIndex>): StockSnapshot {
             snapshotCalls++;if(cancel) throw CancellationException();if(fail) error("offline")
             return StockParser.snapshot(fixture("stocks.json")).copy(session=session,refreshAfterSeconds=quota,
                 quotes=if(missing) emptyMap() else StockParser.snapshot(fixture("stocks.json")).quotes)
         }
         override suspend fun history(baseUrl: String,symbol: String,range: ChartRange): StockHistory {
-            historyCalls++;if(fail) error("offline");return StockParser.history(fixture("stock-history.json"))
+            historyCalls++;if(fail) error("offline");return if(historyPending) StockHistory(pending=true,message="History loading") else StockParser.history(fixture("stock-history.json"))
         }
     }
     private val settings=StockSettings(proxyUrl="https://example.com",watchlist=listOf("AAPL"),indices=emptySet())
@@ -128,6 +138,14 @@ class StockTest {
         source.cancel=false
         assertNull(r.refresh(settings,now).error)
         assertEquals(2,source.snapshotCalls)
+    }
+    @Test fun `pending proxy reload retains a valid chart but never relabels yesterday as today`() = runTest {
+        val source=Source();val r=CachedStockRepository(source);val key=settings.featured to settings.range
+        val original=r.refresh(settings,now).histories.getValue(key);source.historyPending=true
+        val pending=r.refresh(settings,now.plusSeconds(300)).histories.getValue(key)
+        assertEquals(original.points,pending.points);assertTrue(pending.pending)
+        val nextDay=r.refresh(settings,now.plusSeconds(86400)).histories.getValue(key)
+        assertTrue(nextDay.points.isEmpty());assertTrue(nextDay.pending)
     }
     @Test fun `backoff stays bounded`() { assertEquals(60L,stockBackoffSeconds(1));assertEquals(120L,stockBackoffSeconds(2));assertEquals(3600L,stockBackoffSeconds(20)) }
 }

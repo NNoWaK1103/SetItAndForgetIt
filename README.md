@@ -2,6 +2,8 @@
 
 A native Kotlin / Jetpack Compose weather, sports and stock-market dashboard for an always-on landscape Android tablet. Android 8.0 (API 26) or later. Weather and sports need no API key, account or backend. Stocks use an optional operator-configured HTTPS market-data proxy; private provider keys stay on that server. No Android Studio, Firebase or location permission required.
 
+The stock proxy defaults to **Alpaca / IEX**, with explicit single-exchange coverage labels. SIP and 15-minute delayed SIP are configurable on the server. Alpaca's upstream API URL is separate from your own proxy URL; see [Alpaca setup](docs/STOCK_DATA.md).
+
 ## Install an APK
 
 1. Open [Android APK builds](https://github.com/NNoWaK1103/SetItAndForgetIt/actions/workflows/android-apk.yml).
@@ -60,7 +62,7 @@ Offline JUnit fixtures cover ESPN parsing across all leagues, status mapping, nu
 
 Virtual-time coroutine tests cover slideshow boundaries and repeated cycles, background and user pause/resume with remaining time, manual selection, interval changes, startup preferences, duplicate foreground events and ticker selection. Persistence tests write and reopen actual DataStore files, verify legacy preferences, and check invalid-value defaults. Weather ticker tests verify actual fixture values, temperature units, missing data and expired forecasts. Tests do not require live network access.
 
-Stock tests add three-screen order, custom order and disabling each screen, quote/history parsing, daily change calculations, missing data, range caches, failure/backoff and stale-data retention, market-status expiry, Eastern timestamps/DST, ticker labels, stock-card pagination and watchlist/settings persistence. Node tests verify the reference server's serialized request quota, data mapping, retained values and HTTP contract. Persistence tests use real JVM filesystem storage with DataStore 1.3.0's public Preferences serializer, avoiding the mock Android runtime's legacy rename path on Windows.
+Stock tests add three-screen order, custom order and disabling each screen, quote/history parsing, daily changes, caches, stale retention, backoff, session status, ticker labels, pagination and preferences. Node tests cover Alpaca and Massive adapters, authenticated read-only requests, quota/reset handling, historical pagination, feed labels, retained values and the HTTP contract. Persistence tests use real JVM filesystem storage with DataStore 1.3.0's public Preferences serializer, avoiding the mock Android runtime's legacy rename path on Windows.
 
 Sports-group tests cover defaults, custom/overlapping/empty groups, active-group ticker filtering, all-five ticker mode, ordering recent finals, stable polling configuration across group changes, atomic active-group saves, and persistence after reopening DataStore. A virtual-time regression test verifies that changing groups and memberships mid-slide preserves both 10-second deadlines. See [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 

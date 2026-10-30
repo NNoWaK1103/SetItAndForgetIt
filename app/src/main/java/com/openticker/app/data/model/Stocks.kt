@@ -38,14 +38,15 @@ data class StockQuote(
     val symbol: String, val price: Double? = null, val previousClose: Double? = null,
     val high: Double? = null, val low: Double? = null, val volume: Long? = null,
     val updated: Instant? = null, val freshness: QuoteFreshness = QuoteFreshness.UNAVAILABLE,
-    val delayMinutes: Int? = null, val name: String? = null, val exchange: String? = null
+    val delayMinutes: Int? = null, val name: String? = null, val exchange: String? = null, val feedLabel: String? = null
 ) {
     val change: Double? get() = price?.let { p -> previousClose?.let { p - it } }
     val changePercent: Double? get() = change?.let { delta -> previousClose?.takeIf { it > 0 }?.let { delta / it * 100 } }
 }
 data class StockHistoricalPoint(val time: Instant, val close: Double)
 data class StockHistory(val points: List<StockHistoricalPoint> = emptyList(), val message: String? = null,
-    val freshness: QuoteFreshness = QuoteFreshness.UNAVAILABLE, val updated: Instant? = null, val pending: Boolean = false)
+    val freshness: QuoteFreshness = QuoteFreshness.UNAVAILABLE, val updated: Instant? = null, val pending: Boolean = false,
+    val feedLabel: String? = null)
 data class StockSnapshot(val quotes: Map<String, StockQuote>, val session: MarketSession,
     val statusUpdated: Instant?, val received: Instant, val refreshAfterSeconds: Int = 60,
     val warning: String? = null, val provider: String = "Market data provider", val pending: Boolean = false,

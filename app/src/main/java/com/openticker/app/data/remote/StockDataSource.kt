@@ -44,7 +44,7 @@ object StockParser {
             StockQuote(symbol, price, q.positive("previousClose"), q.positive("high"), q.positive("low"),
                 q.num("volume")?.takeIf { it.isFinite() && it >= 0 }?.toLong(), time,
                 if (price == null) QuoteFreshness.UNAVAILABLE else freshness,
-                q.int("delayMinutes")?.coerceAtLeast(0), q.str("name"), q.str("exchange"))
+                q.int("delayMinutes")?.coerceAtLeast(0), q.str("name"), q.str("exchange"), q.str("feedLabel"))
         }.associateBy { it.symbol }
         return StockSnapshot(quotes, MarketSession.entries.find { it.name == root.str("session") } ?: MarketSession.UNKNOWN,
             root.time("statusUpdated"), Instant.now(), (root.int("refreshAfterSeconds") ?: 60).coerceIn(60, 86400),
@@ -58,6 +58,6 @@ object StockParser {
             val time = p.time("time") ?: return@mapNotNull null
             p.positive("close")?.let { StockHistoricalPoint(time, it) }
         }.distinctBy { it.time }.sortedBy { it.time }
-        return StockHistory(points, root.str("message"), root.freshness(), root.time("updated"), (root["pending"] as? JsonPrimitive)?.booleanOrNull == true)
+        return StockHistory(points, root.str("message"), root.freshness(), root.time("updated"), (root["pending"] as? JsonPrimitive)?.booleanOrNull == true, root.str("feedLabel"))
     }
 }

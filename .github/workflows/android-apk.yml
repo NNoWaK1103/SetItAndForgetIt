@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '24'
       - name: Test market-data adapter (offline fixtures)
-        run: node --test server/market-proxy.test.mjs
+        run: node --test server/*.test.mjs
       - name: Reuse debug signing identity for tablet updates
         uses: actions/cache@v4
         with:

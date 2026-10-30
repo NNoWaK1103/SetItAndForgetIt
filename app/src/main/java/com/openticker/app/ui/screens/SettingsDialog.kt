@@ -98,7 +98,7 @@ import com.openticker.app.viewmodel.DashboardState
                 SettingToggle(index.label,index in draft.stocks.indices) { checked -> draft=draft.copy(stocks=draft.stocks.copy(indices=if(checked) draft.stocks.indices+index else draft.stocks.indices-index)) }
             }
             OutlinedTextField(value=proxy,onValueChange={proxy=it},label={Text("Market-data proxy HTTPS URL")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=proxy.isNotBlank() && !validStockProxy(proxy.trim()))
-            Text("Use your configured market-data service URL. Provider credentials stay on the server. No feed is included; prices remain unavailable until configured.",color=Muted,fontSize=11.sp)
+            Text("Use your own proxy's HTTPS URL. Alpaca's API URL is an upstream service, not a proxy. Provider credentials stay on your server.",color=Muted,fontSize=11.sp)
             if(!stocksValid) Text("Check the featured symbol, watchlist (maximum 50), and HTTPS URL without credentials or query parameters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             SettingToggle("Keep screen awake",draft.keepAwake) {draft=draft.copy(keepAwake=it)}
         } },
