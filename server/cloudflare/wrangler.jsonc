@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openticker-market",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-30",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [{ "name": "MARKET_CACHE", "class_name": "MarketDataCache" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MarketDataCache"] }],
+  "vars": {
+    "ALPACA_FEED": "iex",
+    "ALPACA_TRADING_BASE_URL": "https://api.alpaca.markets",
+    "ALPACA_REQUESTS_PER_MINUTE": "60",
+    "MASSIVE_REQUESTS_PER_MINUTE": "5",
+    "MARKET_DISPLAY_LICENSE_CONFIRMED": "false",
+    "MARKET_ALLOWED_SYMBOLS": "HD,AAPL,MSFT,GOOGL,AMZN,NVDA,WMT,COST,TGT,JPM,BAC,BRK.B,UNH,JNJ,LLY,XOM,CVX,CAT,GE,BA"
+  }
+}

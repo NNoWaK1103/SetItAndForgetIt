@@ -6,6 +6,12 @@ on:
     paths:
       - .github/workflows/android-preview.yml
       - scripts/capture-preview.py
+      - scripts/verify-playback.mjs
+      - app/**
+      - gradle/**
+      - gradle.properties
+      - build.gradle.kts
+      - settings.gradle.kts
 permissions:
   contents: read
 concurrency:
@@ -27,6 +33,9 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Build current app
         run: |
           python3 -m py_compile scripts/capture-preview.py
@@ -45,7 +54,9 @@ jobs:
           profile: pixel_c
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -skin 1280x800 -memory 3072 -cores 4 -timezone America/New_York
-          script: python3 scripts/capture-preview.py
+          script: |
+            ANDROID_SERIAL=emulator-5554 node scripts/verify-playback.mjs
+            python3 scripts/capture-preview.py
       - name: Upload screenshots, video and runtime logs
         if: always()
         uses: actions/upload-artifact@v5

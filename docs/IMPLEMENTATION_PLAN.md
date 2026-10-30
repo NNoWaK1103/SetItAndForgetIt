@@ -2,7 +2,7 @@
 
 ## Display contract
 
-- Extend the slideshow to weather → sports → stocks → weather with a configurable ordered list of enabled screens. Keep the default 10-second dwell time, pause/resume controls, 500 ms crossfade, configurable interval and lifecycle cancellation.
+- Extend the slideshow to weather → sports → stocks → weather with a configurable ordered list of enabled screens. Use the requested default 15-second dwell time, pause/resume controls, 500 ms crossfade, configurable interval and lifecycle cancellation.
 - Replace the previous ALL-leagues sports grid with Group A (NFL, NCAAF, NHL) in three equal columns and Group B (NBA, MLB) in two equal columns. Preserve all five provider implementations.
 - Give each league its own sport icon, heading, update timestamp and scrollable game list. Order games live, upcoming, then newest finals. Retain team logos, scores, clock/period and error/empty states.
 - Put a compact group selector in the sports header. Restore the selected group on launch. Groups only change through explicit user selection.

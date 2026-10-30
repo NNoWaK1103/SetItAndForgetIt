@@ -32,9 +32,10 @@ class SettingsPersistenceTest {
                 override suspend fun readFrom(source: BufferedSource) = PreferencesFileSerializer.readFrom(source.inputStream())
                 override suspend fun writeTo(t: Preferences, sink: BufferedSink) = PreferencesFileSerializer.writeTo(t,sink.outputStream())
             }, producePath={produceFile().toOkioPath()}))
-    @Test fun `fresh store defaults to ten second weather first automatic slideshow`() = runTest {
+    @Test fun `fresh store defaults to fifteen second weather first automatic slideshow`() = runTest {
         val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"defaults.preferences_pb")})
         assertEquals(AppSettings(),SettingsStore(data).settings.first())
+        assertEquals(15,SettingsStore(data).settings.first().slideshowIntervalSeconds)
     }
     @Test fun `all preferences survive closing and reopening a real DataStore file`() = runTest {
         val file=File(folder.root,"saved.preferences_pb")
@@ -66,7 +67,7 @@ class SettingsPersistenceTest {
         val restored=SettingsStore(data).settings.first()
         assertEquals("Boston",restored.location.name);assertTrue(restored.celsius)
         assertEquals(setOf(League.NBA),restored.leagues);assertFalse(restored.tickerEnabled)
-        assertTrue(restored.weatherTickerEnabled);assertEquals(10,restored.slideshowIntervalSeconds)
+        assertTrue(restored.weatherTickerEnabled);assertEquals(15,restored.slideshowIntervalSeconds)
         assertEquals(DashboardSlide.WEATHER,restored.startSlide)
         assertEquals(DEFAULT_GROUP_A,restored.sportsGroupA);assertEquals(DEFAULT_GROUP_B,restored.sportsGroupB)
         assertEquals(SportsGroup.A,restored.activeSportsGroup);assertFalse(restored.tickerAllLeagues)
@@ -77,7 +78,7 @@ class SettingsPersistenceTest {
         val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"invalid.preferences_pb")})
         data.edit { it[intPreferencesKey("slideshow_interval")]=0;it[stringPreferencesKey("start_slide")]="UNKNOWN" }
         val restored=SettingsStore(data).settings.first()
-        assertEquals(10,restored.slideshowIntervalSeconds);assertEquals(DashboardSlide.WEATHER,restored.startSlide)
+        assertEquals(15,restored.slideshowIntervalSeconds);assertEquals(DashboardSlide.WEATHER,restored.startSlide)
     }
     @Test fun `selecting a group changes only its preference and survives reopening`() = runTest {
         val file=File(folder.root,"active-group.preferences_pb")
@@ -125,5 +126,31 @@ class SettingsPersistenceTest {
         val saved=AppSettings(celsius=true,slideshowIntervalSeconds=30,stocks=StockSettings(watchlist=listOf("AAPL","BRK.B")))
         store.save(saved);store.selectStockRange(ChartRange.QUARTER)
         assertEquals(saved.copy(stocks=saved.stocks.copy(range=ChartRange.QUARTER)),store.settings.first())
+    }
+    @Test fun `ten fifteen and twenty second intervals persist after reopening`() = runTest {
+        for(seconds in listOf(10,15,20)) {
+            val file=File(folder.root,"interval-$seconds.preferences_pb")
+            val job=SupervisorJob();val scope=CoroutineScope(job+StandardTestDispatcher(testScheduler))
+            val store=SettingsStore(testStore(scope=scope,produceFile={file}))
+            val original=AppSettings(celsius=true,stocks=StockSettings(watchlist=listOf("AAPL")))
+            store.save(original);store.selectSlideshowInterval(seconds)
+            assertEquals(original.copy(slideshowIntervalSeconds=seconds),store.settings.first())
+            job.cancelAndJoin()
+            val reopened=SettingsStore(testStore(scope=backgroundScope,produceFile={file}))
+            assertEquals(seconds,reopened.settings.first().slideshowIntervalSeconds)
+        }
+    }
+    @Test fun `playback controls save independently without overwriting other settings`() = runTest {
+        val store=SettingsStore(testStore(scope=backgroundScope,produceFile={File(folder.root,"playback-controls.preferences_pb")}))
+        val original=AppSettings(celsius=true,slideshowPaused=false,stocks=StockSettings(featured="MSFT"))
+        store.save(original)
+        coroutineScope {
+            launch {store.selectSlideshowInterval(15)}
+            launch {store.selectSlideshowInterval(20)}
+            launch {store.toggleSlideshowPaused()}
+        }
+        assertEquals(original.copy(slideshowIntervalSeconds=20,slideshowPaused=true),store.settings.first())
+        store.toggleSlideshowPaused()
+        assertEquals(original.copy(slideshowIntervalSeconds=20),store.settings.first())
     }
 }

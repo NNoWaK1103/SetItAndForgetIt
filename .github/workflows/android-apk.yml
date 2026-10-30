@@ -30,7 +30,12 @@ jobs:
         with:
           node-version: '24'
       - name: Test market-data adapter (offline fixtures)
-        run: node --test server/*.test.mjs
+        run: node --test server/*.test.mjs server/cloudflare/*.test.mjs
+      - name: Validate serverless proxy bundle (no deployment or secrets required)
+        working-directory: server/cloudflare
+        run: |
+          npm ci
+          npm run check
       - name: Reuse debug signing identity for tablet updates
         uses: actions/cache@v4
         with:

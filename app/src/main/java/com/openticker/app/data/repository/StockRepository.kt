@@ -40,7 +40,7 @@ class CachedStockRepository(private val source: StockDataSource) : StockReposito
             baseUrl = settings.proxyUrl; state = StockMarketUiState(); quoteDue = Instant.MIN
             quoteConfig = null; quoteFailures = 0; historyDue.clear(); historyFailures.clear()
         }
-        if (baseUrl.isBlank()) return@withLock state.copy(error = "Configure your HTTPS market-data proxy in Settings.")
+        if (baseUrl.isBlank()) return@withLock state.copy(error = "Stock data not configured. Add your HTTPS market-data proxy in Settings.")
         state = state.copy(configured = true)
         val config = settings.quoteSymbols() to settings.indices
         // Configuration changes also respect a failure's backoff.

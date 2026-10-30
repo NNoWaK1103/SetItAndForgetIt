@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -26,8 +28,8 @@ import com.openticker.app.data.model.ChartRange
     val playback by model.slideshow.collectAsStateWithLifecycle()
     val stocks by stockModel.state.collectAsStateWithLifecycle()
     val appearance by stockModel.appearance.collectAsStateWithLifecycle()
-    LaunchedEffect(playback.slide,playback.enabledScreens.isEmpty()) {
-        if(playback.slide==DashboardSlide.STOCKS && playback.enabledScreens.isNotEmpty()) stockModel.onStockAppearance()
+    LaunchedEffect(playback.slide,playback.showDashboard) {
+        if(playback.slide==DashboardSlide.STOCKS && playback.showDashboard) stockModel.onStockAppearance()
     }
     val owner=LocalLifecycleOwner.current
     var visible by remember(owner) { mutableStateOf(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
@@ -43,18 +45,18 @@ import com.openticker.app.data.model.ChartRange
     Surface {
         Column(Modifier.fillMaxSize()) {
             val healthy=state.weatherUpdated!=null && state.weatherError==null && state.settings.leagues.all { state.scores[it]?.updated!=null && state.scores[it]?.error==null }
-            DashboardHeader(state.online,healthy,playback.slide,state.settings.slideshowPaused,model::selectSlide,model::toggleSlideshow,playback.enabledScreens) {
+            DashboardHeader(state.online,healthy,playback.slide,state.settings.slideshowPaused,model::selectSlide,model::toggleSlideshow,state.settingsLoaded) {
                 model.clearSearch();settingsOpen=true
             }
             state.settingsError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-            if(playback.enabledScreens.isEmpty()) {
+            if(!playback.showDashboard) {
                 Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=androidx.compose.ui.Alignment.Center) { Text("All screens are disabled. Enable a screen in Settings.") }
             } else {
                 DashboardSlideshow(playback.slide,state,stocks,appearance,stockModel::selectRange,state.settings.animationsEnabled,slideStates,model::manualRefresh,model::selectSportsGroup,Modifier.weight(1f))
                 BottomTicker(playback.slide,state,stocks)
             }
         }
-        if(settingsOpen) SettingsDialog(state,model::search,model::saveSettings) { settingsOpen=false;model.clearSearch() }
+        if(settingsOpen) SettingsDialog(state,model::search,model::saveSettings,model::selectSlideshowInterval) { settingsOpen=false;model.clearSearch() }
     }
 }
 @Composable private fun DashboardSlideshow(slide: DashboardSlide, state: DashboardState, stocks: StockMarketUiState,
@@ -62,11 +64,11 @@ import com.openticker.app.data.model.ChartRange
     savedState: androidx.compose.runtime.saveable.SaveableStateHolder, onRefresh: () -> Unit, onSelectGroup: (SportsGroup) -> Unit, modifier: Modifier = Modifier) {
     val content: @Composable (DashboardSlide) -> Unit = { current ->
         savedState.SaveableStateProvider(current.name) {
-            when(current) {
+            Box(Modifier.fillMaxSize().semantics { contentDescription="${current.label} dashboard" }) { when(current) {
                 DashboardSlide.WEATHER -> WeatherDashboard(state,onRefresh)
                 DashboardSlide.SPORTS -> SportsDashboard(state,onSelectGroup)
                 DashboardSlide.STOCKS -> StockDashboard(stocks,state.settings.stocks,appearance,onRange)
-            }
+            } }
         }
     }
     Box(modifier.fillMaxWidth()) {

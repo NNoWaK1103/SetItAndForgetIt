@@ -128,7 +128,9 @@ class StockTest {
     }
     @Test fun `unconfigured feed never calls source and changed proxy clears cache`() = runTest {
         val source=Source();val r=CachedStockRepository(source)
-        assertFalse(r.refresh(StockSettings(),now).configured);assertEquals(0,source.snapshotCalls)
+        val unconfigured=r.refresh(StockSettings(),now)
+        assertFalse(unconfigured.configured);assertEquals(0,source.snapshotCalls)
+        assertTrue(unconfigured.error!!.contains("Stock data not configured"));assertTrue(unconfigured.quotes.isEmpty())
         r.refresh(settings,now);val cleared=r.refresh(StockSettings(),now.plusSeconds(1))
         assertTrue(cleared.quotes.isEmpty());assertTrue(cleared.histories.isEmpty())
     }
@@ -148,4 +150,24 @@ class StockTest {
         assertTrue(nextDay.points.isEmpty());assertTrue(nextDay.pending)
     }
     @Test fun `backoff stays bounded`() { assertEquals(60L,stockBackoffSeconds(1));assertEquals(120L,stockBackoffSeconds(2));assertEquals(3600L,stockBackoffSeconds(20)) }
+    @Test fun `full company watchlist is preserved and proxy requests batch fifty symbols without losing warnings`() = runTest {
+        val symbols=(1..500).map { "S$it" }
+        val settings=StockSettings(watchlist=symbols).normalized()
+        assertEquals(500,settings.watchlist.size)
+        val requests=mutableListOf<okhttp3.HttpUrl>()
+        val source=ProxyStockDataSource { url ->
+            requests+=url
+            val batch=url.queryParameter("symbols")!!.split(',')
+            val quotes=batch.joinToString(",") { """{"symbol":"$it","price":100,"updated":"2026-10-29T14:00:00Z","freshness":"REALTIME"}""" }
+            """{"quotes":[$quotes],"warning":"Provider warning","refreshAfterSeconds":120,"staleSymbols":["${batch.first()}"]}"""
+        }
+        val result=source.snapshot("https://proxy.example/market",settings.quoteSymbols(),setOf(MarketIndex.SP500))
+        assertEquals(11,requests.size);assertEquals(501,result.quotes.size)
+        assertTrue(requests.all { it.queryParameter("symbols")!!.split(',').size<=50 })
+        assertEquals("I:SPX",requests.first().queryParameter("indices"))
+        assertTrue(requests.drop(1).all { it.queryParameter("indices")=="" })
+        assertTrue(requests.all { it.encodedPath=="/market/v1/quotes" })
+        assertEquals("Provider warning",result.warning);assertEquals(120,result.refreshAfterSeconds)
+        assertEquals(11,result.staleSymbols.size)
+    }
 }

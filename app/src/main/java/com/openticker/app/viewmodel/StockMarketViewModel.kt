@@ -7,7 +7,6 @@ import com.openticker.app.data.model.ChartRange
 import com.openticker.app.data.remote.*
 import com.openticker.app.data.repository.*
 import com.openticker.app.settings.SettingsStore
-import com.openticker.app.slideshow.DashboardSlide
 import com.openticker.app.util.ConnectivityMonitor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -25,8 +24,8 @@ class StockMarketViewModel(application: Application) : AndroidViewModel(applicat
     init {
         viewModelScope.launch {
             combine(active, ConnectivityMonitor(application).online, store.settings) { visible, online, settings ->
-                Triple(visible && online && DashboardSlide.STOCKS in settings.enabledScreens, settings.stocks, settings.enabledScreens)
-            }.distinctUntilChanged().collectLatest { (run, settings, _) ->
+                (visible && online) to settings.stocks
+            }.distinctUntilChanged().collectLatest { (run, settings) ->
                 if (run) while (currentCoroutineContext().isActive) {
                     mutable.value = mutable.value.copy(refreshing = true)
                     mutable.value = repository.refresh(settings, Instant.now())

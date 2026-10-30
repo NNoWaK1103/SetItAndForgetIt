@@ -15,14 +15,15 @@ import com.openticker.app.slideshow.DashboardSlide
 import com.openticker.app.ui.theme.*
 import com.openticker.app.viewmodel.DashboardState
 
-@Composable fun SettingsDialog(state: DashboardState, onSearch: (String) -> Unit, onSave: (AppSettings) -> Unit, onDismiss: () -> Unit) {
+@Composable fun SettingsDialog(state: DashboardState, onSearch: (String) -> Unit, onSave: (AppSettings) -> Unit,
+    onInterval: (Int) -> Unit, onDismiss: () -> Unit) {
     var draft by remember { mutableStateOf(state.settings) }
     var query by remember { mutableStateOf("") }
     var featured by remember { mutableStateOf(draft.stocks.featured) }
     var watchlist by remember { mutableStateOf(draft.stocks.watchlist.joinToString(", ")) }
     var proxy by remember { mutableStateOf(draft.stocks.proxyUrl) }
     val parsedWatchlist = watchlist.split(',', ' ', '\n').filter { it.isNotBlank() }
-    val stocksValid = normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=50 && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
+    val stocksValid = normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=MAX_STOCK_WATCHLIST_SIZE && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
     AlertDialog(onDismissRequest=onDismiss, title={ Text("Make it yours") },
         text={ Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Text("Automatic slideshow",color=Mint,fontSize=13.sp)
@@ -32,11 +33,18 @@ import com.openticker.app.viewmodel.DashboardState
                     draft=draft.copy(enabledScreens=if(enabled) draft.enabledScreens+slide else draft.enabledScreens-slide)
                 }
             }
-            Text("${draft.enabledScreens.joinToString(" → ") { it.label }}. Re-enable a screen to place it last. If all are disabled, playback stops.",color=Muted,fontSize=11.sp)
+            Text("${draft.enabledScreens.joinToString(" → ") { it.label }}. These switches control automatic rotation. All three header buttons remain available.",color=Muted,fontSize=11.sp)
             SettingToggle("Pause automatic switching",draft.slideshowPaused) {draft=draft.copy(slideshowPaused=it)}
-            Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { SLIDESHOW_INTERVALS.forEach { seconds ->
-                FilterChip(selected=draft.slideshowIntervalSeconds==seconds,onClick={draft=draft.copy(slideshowIntervalSeconds=seconds)},label={Text("${seconds}s",fontSize=10.sp)})
-            } }
+            Text("Time on each screen",color=Mint,fontSize=13.sp)
+            listOf(PRIMARY_SLIDESHOW_INTERVALS,SLIDESHOW_INTERVALS-PRIMARY_SLIDESHOW_INTERVALS.toSet()).forEach { intervals ->
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { intervals.forEach { seconds ->
+                    FilterChip(selected=draft.slideshowIntervalSeconds==seconds,onClick={
+                        draft=draft.copy(slideshowIntervalSeconds=seconds);onInterval(seconds)
+                    },label={Text("${seconds}s",fontSize=12.sp)})
+                } }
+            }
+            Text("Interval changes apply immediately and are saved, including when you close this dialog with Cancel. Other settings use Save settings.",color=Muted,fontSize=11.sp)
+            state.settingsError?.let { Text(it,color=MaterialTheme.colorScheme.error,fontSize=12.sp) }
             Text("Start on",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { DashboardSlide.entries.forEach { slide ->
                 FilterChip(selected=draft.startSlide==slide,onClick={draft=draft.copy(startSlide=slide)},label={Text(slide.label)})
@@ -77,7 +85,7 @@ import com.openticker.app.viewmodel.DashboardState
             OutlinedTextField(value=featured,onValueChange={featured=it},label={Text("Featured ticker (default HD)")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=normalizeStockSymbol(featured)==null)
             Text("Home Depot always stays visible, including when you feature another company.",color=Muted,fontSize=11.sp)
             OutlinedTextField(value=watchlist,onValueChange={watchlist=it},label={Text("Watchlist symbols, separated by commas")},modifier=Modifier.fillMaxWidth(),minLines=2)
-            Text("Up to 50 symbols; e.g. AAPL, MSFT, BRK.B. Custom symbols use the Other category.",color=Muted,fontSize=11.sp)
+            Text("Up to 500 symbols; e.g. AAPL, MSFT, BRK.B. Custom symbols use the Other category.",color=Muted,fontSize=11.sp)
             StockCategory.entries.chunked(3).forEach { categories ->
                 Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { categories.forEach { category ->
                     FilterChip(selected=category in draft.stocks.categories,onClick={draft=draft.copy(stocks=draft.stocks.copy(categories=if(category in draft.stocks.categories) draft.stocks.categories-category else draft.stocks.categories+category))},label={Text(category.label,fontSize=10.sp)})
@@ -99,7 +107,7 @@ import com.openticker.app.viewmodel.DashboardState
             }
             OutlinedTextField(value=proxy,onValueChange={proxy=it},label={Text("Market-data proxy HTTPS URL")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=proxy.isNotBlank() && !validStockProxy(proxy.trim()))
             Text("Use your own proxy's HTTPS URL. Alpaca's API URL is an upstream service, not a proxy. Provider credentials stay on your server.",color=Muted,fontSize=11.sp)
-            if(!stocksValid) Text("Check the featured symbol, watchlist (maximum 50), and HTTPS URL without credentials or query parameters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
+            if(!stocksValid) Text("Check the featured symbol, watchlist (maximum 500), and HTTPS URL without credentials or query parameters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             SettingToggle("Keep screen awake",draft.keepAwake) {draft=draft.copy(keepAwake=it)}
         } },
         confirmButton={TextButton(enabled=stocksValid,onClick={onSave(draft.copy(stocks=draft.stocks.copy(featured=featured,watchlist=parsedWatchlist,proxyUrl=proxy).normalized()));onDismiss()}) {Text("Save settings")}},

@@ -14,16 +14,28 @@ interface StockDataSource {
 }
 
 /** Only calls an operator-configured HTTPS proxy. Provider credentials never enter the app. */
-class ProxyStockDataSource(private val http: HttpClient) : StockDataSource {
+class ProxyStockDataSource(private val get: suspend (okhttp3.HttpUrl) -> String) : StockDataSource {
+    constructor(http: HttpClient) : this(http::get)
     private fun url(base: String, path: String) = base.also { require(validStockProxy(it)) }
         .toHttpUrl().newBuilder().addPathSegments(path)
     override suspend fun snapshot(baseUrl: String, symbols: List<String>, indices: Set<MarketIndex>) = withContext(Dispatchers.IO) {
-        StockParser.snapshot(http.get(url(baseUrl, "v1/quotes")
-            .addQueryParameter("symbols", symbols.joinToString(","))
-            .addQueryParameter("indices", indices.joinToString(",") { it.symbol }).build()))
+        require(symbols.isNotEmpty())
+        // Bound each proxy request even when the user configures the full company watchlist.
+        val snapshots = symbols.distinct().chunked(50).mapIndexed { index, batch ->
+            StockParser.snapshot(get(url(baseUrl, "v1/quotes")
+                .addQueryParameter("symbols", batch.joinToString(","))
+                .addQueryParameter("indices", if(index==0) indices.joinToString(",") { it.symbol } else "").build()))
+        }
+        snapshots.maxBy { it.statusUpdated ?: Instant.MIN }.copy(
+            quotes = snapshots.flatMap { it.quotes.entries }.associate { it.key to it.value },
+            received = snapshots.maxOf { it.received },
+            refreshAfterSeconds = snapshots.maxOf { it.refreshAfterSeconds },
+            warning = snapshots.mapNotNull { it.warning }.distinct().joinToString(" ").takeIf { it.isNotBlank() },
+            pending = snapshots.any { it.pending },
+            staleSymbols = snapshots.flatMap { it.staleSymbols }.toSet())
     }
     override suspend fun history(baseUrl: String, symbol: String, range: ChartRange) = withContext(Dispatchers.IO) {
-        StockParser.history(http.get(url(baseUrl, "v1/history").addQueryParameter("symbol", symbol)
+        StockParser.history(get(url(baseUrl, "v1/history").addQueryParameter("symbol", symbol)
             .addQueryParameter("range", range.label).build()))
     }
 }

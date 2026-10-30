@@ -1,0 +1,13 @@
+{
+  "name": "openticker-market-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test worker.test.mjs",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/build",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": { "wrangler": "4.156.0" },
+  "engines": { "node": ">=22" }
+}

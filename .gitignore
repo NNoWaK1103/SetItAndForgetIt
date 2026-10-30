@@ -5,6 +5,11 @@ local.properties
 *.iml
 .idea/
 downloads/
+preview-output/
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
 *.jks
 *.keystore
 .env

@@ -18,7 +18,7 @@ data class AppSettings(
     val sportsRefreshSeconds: Int = 30,
     val tickerEnabled: Boolean = true,
     val keepAwake: Boolean = true,
-    val slideshowIntervalSeconds: Int = 10,
+    val slideshowIntervalSeconds: Int = DEFAULT_SLIDESHOW_INTERVAL_SECONDS,
     val slideshowPaused: Boolean = false,
     val startSlide: DashboardSlide = DashboardSlide.WEATHER,
     val weatherTickerEnabled: Boolean = true,
@@ -30,7 +30,9 @@ data class AppSettings(
     val enabledScreens: List<DashboardSlide> = DashboardSlide.entries.toList(),
     val stocks: StockSettings = StockSettings()
 )
-val SLIDESHOW_INTERVALS = listOf(5, 10, 15, 30, 60)
+const val DEFAULT_SLIDESHOW_INTERVAL_SECONDS = 15
+val SLIDESHOW_INTERVALS = listOf(5, 10, 15, 20, 30, 60)
+val PRIMARY_SLIDESHOW_INTERVALS = listOf(10, 15, 20)
 class SettingsStore(private val store: DataStore<Preferences>) {
     constructor(context: Context) : this(context.applicationContext.settingsDataStore)
     private object Keys {
@@ -66,7 +68,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             leagues = p[Keys.leagues]?.let { names -> League.entries.filter { it.name in names }.toSet() } ?: League.entries.toSet(),
             sportsRefreshSeconds = (p[Keys.refresh] ?: 30).coerceIn(30, 300),
             tickerEnabled = p[Keys.ticker] ?: true, keepAwake = p[Keys.awake] ?: true,
-            slideshowIntervalSeconds = p[Keys.interval]?.takeIf { it in SLIDESHOW_INTERVALS } ?: 10,
+            slideshowIntervalSeconds = p[Keys.interval]?.takeIf { it in SLIDESHOW_INTERVALS } ?: DEFAULT_SLIDESHOW_INTERVAL_SECONDS,
             slideshowPaused = p[Keys.paused] ?: false,
             startSlide = DashboardSlide.entries.find { it.name == p[Keys.start] } ?: DashboardSlide.WEATHER,
             weatherTickerEnabled = p[Keys.weatherTicker] ?: true,
@@ -92,7 +94,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         p[Keys.latitude] = value.location.latitude; p[Keys.longitude] = value.location.longitude
         p[Keys.celsius] = value.celsius; p[Keys.leagues] = value.leagues.map { it.name }.toSet()
         p[Keys.refresh] = value.sportsRefreshSeconds; p[Keys.ticker] = value.tickerEnabled; p[Keys.awake] = value.keepAwake
-        p[Keys.interval] = value.slideshowIntervalSeconds.takeIf { it in SLIDESHOW_INTERVALS } ?: 10
+        p[Keys.interval] = value.slideshowIntervalSeconds.takeIf { it in SLIDESHOW_INTERVALS } ?: DEFAULT_SLIDESHOW_INTERVAL_SECONDS
         p[Keys.paused] = value.slideshowPaused; p[Keys.start] = value.startSlide.name
         p[Keys.weatherTicker] = value.weatherTickerEnabled; p[Keys.animations] = value.animationsEnabled
         p[Keys.groupA] = value.sportsGroupA.map { it.name }.toSet()
@@ -108,4 +110,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     } }
     suspend fun selectSportsGroup(group: SportsGroup) { store.edit { it[Keys.activeGroup] = group.name } }
     suspend fun selectStockRange(range: ChartRange) { store.edit { it[Keys.range] = range.name } }
+    suspend fun selectSlideshowInterval(seconds: Int) {
+        require(seconds in SLIDESHOW_INTERVALS)
+        store.edit { it[Keys.interval] = seconds }
+    }
+    suspend fun toggleSlideshowPaused() { store.edit { it[Keys.paused] = !(it[Keys.paused] ?: false) } }
 }

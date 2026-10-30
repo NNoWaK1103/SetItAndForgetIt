@@ -60,7 +60,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     fun setActive(value: Boolean) { active.value = value; slideshowController.setForeground(value) }
     fun selectSlide(slide: DashboardSlide) { slideshowController.select(slide) }
-    fun toggleSlideshow() { saveSettings(state.value.settings.copy(slideshowPaused = !state.value.settings.slideshowPaused)) }
+    fun toggleSlideshow() { viewModelScope.launch {
+        try { store.toggleSlideshowPaused(); mutable.update { it.copy(settingsError = null) } }
+        catch(e: CancellationException) { throw e }
+        catch(_: Exception) { mutable.update { it.copy(settingsError = "Could not save playback state. Please try again.") } }
+    } }
+    fun selectSlideshowInterval(seconds: Int) { viewModelScope.launch {
+        try { store.selectSlideshowInterval(seconds); mutable.update { it.copy(settingsError = null) } }
+        catch(e: CancellationException) { throw e }
+        catch(_: Exception) { mutable.update { it.copy(settingsError = "Could not save slideshow interval. Please try again.") } }
+    } }
     fun selectSportsGroup(group: SportsGroup) { viewModelScope.launch {
         try { store.selectSportsGroup(group); mutable.update { it.copy(settingsError = null) } }
         catch(e: CancellationException) { throw e }

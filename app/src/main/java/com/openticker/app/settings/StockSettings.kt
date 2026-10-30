@@ -4,6 +4,7 @@ import com.openticker.app.data.model.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 val STOCK_REFRESH_INTERVALS = listOf(60, 120, 300, 900, 1800)
+const val MAX_STOCK_WATCHLIST_SIZE = 500
 data class StockSettings(
     val featured: String = "HD",
     val watchlist: List<String> = STOCK_COMPANIES.drop(1).map { it.symbol },
@@ -19,7 +20,7 @@ data class StockSettings(
     // HD stays visible even if the user features a different stock.
     fun quoteSymbols(): List<String> = (listOf("HD") + selectedSymbols()).distinct()
     fun normalized() = copy(featured = normalizeStockSymbol(featured) ?: "HD",
-        watchlist = watchlist.mapNotNull(::normalizeStockSymbol).distinct().take(50),
+        watchlist = watchlist.mapNotNull(::normalizeStockSymbol).distinct().take(MAX_STOCK_WATCHLIST_SIZE),
         refreshSeconds = refreshSeconds.takeIf { it in STOCK_REFRESH_INTERVALS } ?: 60,
         proxyUrl = proxyUrl.trim().takeIf { it.isEmpty() || validStockProxy(it) } ?: "")
 }

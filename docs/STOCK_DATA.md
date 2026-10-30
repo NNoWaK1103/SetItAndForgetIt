@@ -1,6 +1,6 @@
 # Stock market data and deployment
 
-The stock screen is enabled by default and rotates after weather and sports, ten seconds per screen. No quotes, credentials, or mock prices are bundled. Configure an HTTPS proxy in Settings to obtain market data. Weather and sports continue working without a stock service.
+The stock screen is enabled by default and rotates after weather and sports, 15 seconds per screen. No quotes, credentials, or mock prices are bundled. Configure an HTTPS proxy in Settings to obtain market data. Weather and sports continue working without a stock service.
 
 ## Provider evaluation
 
@@ -16,6 +16,8 @@ Evaluated against the providers' published documentation on October 29, 2026. Pl
 **Alpaca is the selected provider and the server's default.** The user-supplied `https://api.alpaca.markets` is Alpaca's upstream trading/clock host. Market-data requests use `https://data.alpaca.markets`. Neither URL is an OpenTicker proxy: the Android Settings URL must point to your own HTTPS proxy running the code below. Both Alpaca credentials remain on that server. No provider account, credentials or hosted proxy have been configured by this source change. The existing Massive adapter remains available as an alternative.
 
 ## Reference proxy
+
+The [Cloudflare Worker](../server/cloudflare/README.md) is the serverless deployment option: SQLite Durable Object caches, shared rate limits, secret bindings and a dedicated `/v1/indices` endpoint. Follow that guide for a new deployment without running a server. The Node service below remains available for existing installations.
 
 Requires Node.js 24; no npm packages. Run offline tests with:
 
@@ -96,7 +98,7 @@ Nonempty points have `time` and `close`, containing only provider-supplied value
 
 ## Android behavior
 
-Quotes and chart ranges cache independently in `CachedStockRepository`; weather and sports keep their existing caches. Transitions and card rotation never call a repository. Foreground/connectivity-aware polling runs independently of the slideshow. Stocks stop polling if that screen is disabled. During open sessions quotes refresh at the selected interval (minimum 60 seconds); closed/unknown sessions use at least 15 minutes. The provider's refresh floor and bounded failure backoff can lengthen this. Initial server loading is checked at the chosen open interval. Charts cache by symbol and range (1D: at least five minutes; others: six hours); pending charts are checked after a minute. Backgrounding cancels requests and removes animation producers.
+Quotes and chart ranges cache independently in `CachedStockRepository`; weather and sports keep their existing caches. Transitions and card rotation never call a repository. Foreground/connectivity-aware polling runs independently of the slideshow. Stocks stay available through manual navigation even when excluded from automatic rotation, and their cache stays warm while the app is visible and online. During open sessions quotes refresh at the selected interval (minimum 60 seconds); closed/unknown sessions use at least 15 minutes. The provider's refresh floor and bounded failure backoff can lengthen this. Initial server loading is checked at the chosen open interval. Charts cache by symbol and range (1D: at least five minutes; others: six hours); pending charts are checked after a minute. Backgrounding cancels requests and removes animation producers.
 
 Settings persist the ordered enabled-screen list, featured symbol, ordered watchlist (maximum 50), categories, range, ticker, rotation, interval, indices, and non-secret proxy URL in DataStore. Custom symbols use Other. Eight watchlist cards appear per visit; Home Depot stays pinned if another company is featured. The ticker always starts with HD. Fortune 500 is a company-revenue ranking, not a stock index; the configurable directory does not assert current membership or numerical ranks.
 

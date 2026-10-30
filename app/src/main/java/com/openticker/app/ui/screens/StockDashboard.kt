@@ -54,8 +54,8 @@ private fun direction(quote: StockQuote?) = when {
                 StockGrid(symbols, state.quotes, Modifier.weight(1f),state.staleSymbols)
             }
         }
-        Text(state.error ?: "${state.provider} · quotes carry their own data timestamps · checked ${stockTime(state.fetched)}",
-            color=if(state.error!=null) Accent else StockMuted, fontSize=11.sp, maxLines=2, overflow=TextOverflow.Ellipsis)
+        Text(if(!state.configured) "Stock data not configured. Add your HTTPS market-data proxy in Settings." else state.error ?: "${state.provider} · quotes carry their own data timestamps · checked ${stockTime(state.fetched)}",
+            color=if(state.error!=null || !state.configured) Accent else StockMuted, fontSize=11.sp, maxLines=2, overflow=TextOverflow.Ellipsis)
     }
 }
 
