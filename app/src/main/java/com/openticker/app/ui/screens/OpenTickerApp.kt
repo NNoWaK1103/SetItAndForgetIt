@@ -40,12 +40,15 @@ import com.openticker.app.data.model.ChartRange
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
+    // Keep the editor composed across background/foreground transitions so its draft is retained.
+    if(settingsOpen) SettingsDialog(state,model::search,{ settings ->
+        model.saveSettings(settings) { settingsOpen=false;model.clearSearch() }
+    }) { settingsOpen=false;model.clearSearch() }
     // Remove animation and clock producers from composition while backgrounded.
     if(!visible) { Box(Modifier.fillMaxSize().background(SportsBackground)); return }
     Surface {
         Column(Modifier.fillMaxSize()) {
-            val healthy=state.weatherUpdated!=null && state.weatherError==null && state.settings.leagues.all { state.scores[it]?.updated!=null && state.scores[it]?.error==null }
-            DashboardHeader(state.online,healthy,playback.slide,state.settings.slideshowPaused,model::selectSlide,model::toggleSlideshow,state.settingsLoaded) {
+            DashboardHeader(state.online,playback.slide,state.settings.slideshowPaused,model::selectSlide,model::toggleSlideshow,state.settingsLoaded) {
                 model.clearSearch();settingsOpen=true
             }
             state.settingsError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
@@ -56,7 +59,6 @@ import com.openticker.app.data.model.ChartRange
                 BottomTicker(playback.slide,state,stocks)
             }
         }
-        if(settingsOpen) SettingsDialog(state,model::search,model::saveSettings,model::selectSlideshowInterval) { settingsOpen=false;model.clearSearch() }
     }
 }
 @Composable private fun DashboardSlideshow(slide: DashboardSlide, state: DashboardState, stocks: StockMarketUiState,

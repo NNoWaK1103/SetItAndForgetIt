@@ -28,6 +28,9 @@ import com.openticker.app.util.*
 import com.openticker.app.viewmodel.DashboardState
 import com.openticker.app.data.repository.StockMarketUiState
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -59,13 +62,26 @@ import java.time.ZoneId
     val games = remember(state.scores,state.settings.leagues,state.settings.sportsGroupA,state.settings.sportsGroupB,state.settings.activeSportsGroup,state.settings.tickerAllLeagues) {
         sportsTickerGames(state.scores.values.flatMap { it.games },state.settings)
     }
-    val text=remember(games) { if(games.isEmpty()) "OPENTICKER   •   Waiting for scheduled games and score updates" else games.joinToString("     ◆     ") { tickerText(it) } }
+    val now by produceState(Instant.now()) { while(true) { value=Instant.now(); delay(30_000) } }
+    val text=remember(games,state.scores,state.online,now) {
+        if(games.isEmpty()) "OPENTICKER   •   Waiting for scheduled games and score updates"
+        else games.joinToString("     ◆     ") { game ->
+            val feed=state.scores[game.league]
+            val stale=!state.online || feed?.restored==true || feed?.error!=null ||
+                feed?.updated?.let { now.epochSecond-it.epochSecond>300 }==true
+            tickerText(game) + if(stale) " · SAVED ${feed?.updated?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) ?: "time unavailable"}" else ""
+        }
+    }
     TickerLine(AnnotatedString(text),animate,position)
 }
 @Composable private fun WeatherTicker(state: DashboardState, animate: Boolean, position: MutableFloatState) {
-    val text=remember(state.weather,state.settings.location,state.settings.celsius,state.weatherUpdated) {
+    val now by produceState(Instant.now()) { while(true) { value=Instant.now(); delay(30_000) } }
+    val text=remember(state.weather,state.settings.location,state.settings.celsius,state.weatherUpdated,state.weatherRestored,state.weatherError,state.online,now) {
         val zone=runCatching { ZoneId.of(state.weather?.timezone ?: "UTC") }.getOrDefault(ZoneId.of("UTC"))
-        weatherTickerText(state.weather,state.settings.location,state.settings.celsius,LocalDateTime.now(zone))
+        val stale=!state.online || state.weatherRestored || state.weatherError!=null ||
+            state.weatherUpdated?.let { now.epochSecond-it.epochSecond>=900 }==true
+        val prefix=if(stale && state.weather!=null) "SAVED WEATHER · ${state.weatherUpdated?.atZone(zone)?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) ?: "time unavailable"}     ◆     " else ""
+        prefix + weatherTickerText(state.weather,state.settings.location,state.settings.celsius,LocalDateTime.ofInstant(now,zone))
     }
     TickerLine(AnnotatedString(text),animate,position)
 }

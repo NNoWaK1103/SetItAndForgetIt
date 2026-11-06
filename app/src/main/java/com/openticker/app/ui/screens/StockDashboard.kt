@@ -51,11 +51,11 @@ private fun direction(quote: StockQuote?) = when {
                     Text("${if(settings.rotate) Math.floorMod(appearance,pages)+1 else 1} / $pages", color=StockMuted, fontSize=12.sp)
                 }
                 Text("Fortune 500 is a revenue ranking, not a stock index. Membership varies by year.", color=StockMuted, fontSize=10.sp)
-                StockGrid(symbols, state.quotes, Modifier.weight(1f),state.staleSymbols)
+                StockGrid(symbols, state.quotes, Modifier.weight(1f),if (state.online) state.staleSymbols else state.quotes.keys)
             }
         }
-        Text(if(!state.configured) "Stock data not configured. Add your HTTPS market-data proxy in Settings." else state.error ?: "${state.provider} · quotes carry their own data timestamps · checked ${stockTime(state.fetched)}",
-            color=if(state.error!=null || !state.configured) Accent else StockMuted, fontSize=11.sp, maxLines=2, overflow=TextOverflow.Ellipsis)
+        Text(if(!state.configured) "Stock data not configured. Add your HTTPS market-data proxy in Settings." else if (!state.online) "Offline · ${if (state.quotes.isEmpty()) "no saved market quotes" else "showing saved market data · may be stale"}" else state.error ?: "${state.provider} · quotes carry their own data timestamps · checked ${stockTime(state.fetched)}",
+            color=if(!state.online || state.error!=null || !state.configured) Accent else StockMuted, fontSize=11.sp, maxLines=2, overflow=TextOverflow.Ellipsis)
     }
 }
 
@@ -75,7 +75,7 @@ private fun direction(quote: StockQuote?) = when {
                         Text(stockPrice(quote?.price,false), fontSize=17.sp, fontWeight=FontWeight.SemiBold, maxLines=1)
                         Text(stockSigned(quote?.changePercent,"%"),color=direction(quote),fontSize=12.sp,maxLines=1)
                     }
-                    Text("${stockFreshness(quote)}${if(index.symbol in state.staleSymbols) " · stale" else ""} · ${stockTime(quote?.updated)}", color=StockMuted, fontSize=9.sp, maxLines=1)
+                    Text("${stockFreshness(quote)}${if(index.symbol in state.staleSymbols || (!state.online && quote != null)) " · stale" else ""} · ${stockTime(quote?.updated)}", color=StockMuted, fontSize=9.sp, maxLines=1)
                 }
             }
         }
@@ -97,7 +97,7 @@ private fun direction(quote: StockQuote?) = when {
             Text("MARKET ${state.sessionAt(now).name}",color=StockMuted,fontSize=10.sp)
             Text(stockPrice(quote?.price), fontSize=36.sp, fontWeight=FontWeight.Bold, letterSpacing=(-1).sp)
             Text("${stockDollarChange(quote?.change)}  (${stockSigned(quote?.changePercent,"%")})",color=direction(quote),fontSize=17.sp,fontWeight=FontWeight.SemiBold)
-            Text("${stockFreshness(quote)}${if(symbol in state.staleSymbols) " · stale" else ""} · ${stockTime(quote?.updated)}",color=StockMuted,fontSize=10.sp)
+            Text("${stockFreshness(quote)}${if(symbol in state.staleSymbols || (!state.online && quote != null)) " · stale" else ""} · ${stockTime(quote?.updated)}",color=StockMuted,fontSize=10.sp)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                 ChartRange.entries.forEach { item ->
                     TextButton(onClick={onRange(item)},contentPadding=PaddingValues(horizontal=5.dp),modifier=Modifier.defaultMinSize(minWidth=1.dp)) {
@@ -105,7 +105,7 @@ private fun direction(quote: StockQuote?) = when {
                     }
                 }
             }
-            StockChart(state.histories[key], range, state.historyErrors[key], direction(quote), Modifier.fillMaxWidth().height(122.dp))
+            StockChart(state.histories[key], range, state.historyErrors[key] ?: if (!state.online || key in state.staleHistories) "Saved chart · may be stale" else null, direction(quote), Modifier.fillMaxWidth().height(122.dp))
             HorizontalDivider(color=Color(0xFF2A3546))
             val closed = quote?.freshness == QuoteFreshness.PREVIOUS_CLOSE
             StockMetric("Previous close",stockPrice(quote?.previousClose))

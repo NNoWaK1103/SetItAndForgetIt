@@ -30,10 +30,17 @@ import java.util.Locale
         val compact=maxHeight<550.dp
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=22.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 14.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { SectionLabel("YOUR WEATHER, AT A GLANCE",state.weatherUpdated?.atZone(zone)?.format(DateTimeFormatter.ofPattern("'Updated' h:mm a"))) }
+                Box(Modifier.weight(1f)) { SectionLabel("YOUR WEATHER, AT A GLANCE",state.weatherUpdated?.atZone(zone)?.format(DateTimeFormatter.ofPattern("'Updated' MMM d, h:mm a"))) }
                 TextButton(onClick=onRefresh,enabled=state.online && !state.refreshing,modifier=Modifier.height(30.dp),contentPadding=PaddingValues(horizontal=12.dp)) { Text("Refresh",fontSize=11.sp) }
             }
-            val warning=if(!state.online) "Offline · weather may be out of date" else state.weatherError
+            val warning=when {
+                !state.online -> if(weather == null) "Network offline · no saved weather" else "Network offline · showing saved weather"
+                state.weatherError != null -> state.weatherError
+                state.weatherRestored -> "Saved weather · awaiting refresh"
+                state.weatherUpdated?.let { now.toEpochSecond() - it.epochSecond >= 900 } == true -> "Weather update overdue · showing last received data"
+                weather == null -> "Weather feed · awaiting first response"
+                else -> null
+            }
             warning?.let { Text(it,color=Color(0xFFFFCA82),fontSize=11.sp) }
             if(weather==null) {
                 Text(state.settings.location.label,fontSize=26.sp)

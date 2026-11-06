@@ -170,4 +170,69 @@ class StockTest {
         assertEquals("Provider warning",result.warning);assertEquals(120,result.refreshAfterSeconds)
         assertEquals(11,result.staleSymbols.size)
     }
+    @Test fun `disk snapshot restores offline without requests or new timestamps`() = runTest {
+        val directory = java.nio.file.Files.createTempDirectory("stock-cache").toFile()
+        try {
+            val disk = LastGoodCache(directory)
+            val first = CachedStockRepository(Source(), disk).refresh(settings, now)
+            val source = Source().also { it.fail = true }
+            val restarted = CachedStockRepository(source, disk)
+            val restored = restarted.restore(settings)
+            assertEquals(first.quotes, restored.quotes)
+            assertEquals(first.fetched, restored.fetched)
+            assertEquals(first.statusUpdated, restored.statusUpdated)
+            assertEquals(first.histories, restored.histories)
+            assertEquals(first.quotes.keys, restored.staleSymbols)
+            assertEquals(first.histories.keys, restored.staleHistories)
+            assertEquals(0, source.snapshotCalls)
+            assertEquals(0, source.historyCalls)
+            restarted.refresh(settings, now.plusSeconds(3600))
+            val afterFailure = CachedStockRepository(Source(), disk).restore(settings)
+            assertEquals(first.quotes, afterFailure.quotes)
+            assertEquals(first.fetched, afterFailure.fetched)
+            assertEquals(first.histories, afterFailure.histories)
+        } finally { directory.deleteRecursively() }
+    }
+    @Test fun `disk stock data is scoped to proxy and corrupted data is ignored`() = runTest {
+        val directory = java.nio.file.Files.createTempDirectory("stock-cache").toFile()
+        try {
+            val disk = LastGoodCache(directory)
+            CachedStockRepository(Source(), disk).refresh(settings, now)
+            val source = Source()
+            val repository = CachedStockRepository(source, disk)
+            assertTrue(repository.restore(settings.copy(proxyUrl = "https://another.example")).quotes.isEmpty())
+            assertFalse(repository.restore(StockSettings()).configured)
+            assertFalse(repository.restore(settings).quotes.isEmpty())
+            directory.listFiles()!!.forEach { it.writeText("broken cache") }
+            assertTrue(CachedStockRepository(source, disk).restore(settings).quotes.isEmpty())
+            assertEquals(0, source.snapshotCalls)
+        } finally { directory.deleteRecursively() }
+    }
+    @Test fun `successful refresh clears restored stale chart and quote state`() = runTest {
+        val directory = java.nio.file.Files.createTempDirectory("stock-cache").toFile()
+        try {
+            val disk = LastGoodCache(directory)
+            CachedStockRepository(Source(), disk).refresh(settings, now)
+            val repository = CachedStockRepository(Source(), disk)
+            assertTrue(repository.restore(settings).staleSymbols.isNotEmpty())
+            val fresh = repository.refresh(settings, now.plusSeconds(10))
+            assertTrue(fresh.staleSymbols.isEmpty())
+            assertTrue(fresh.staleHistories.isEmpty())
+            assertEquals(now.plusSeconds(10), fresh.fetched)
+            assertNull(fresh.error)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun `provider HTTP failures are not called offline`() = runTest {
+        val source = object : StockDataSource {
+            override suspend fun snapshot(baseUrl: String, symbols: List<String>, indices: Set<MarketIndex>): StockSnapshot = throw FeedHttpException(503)
+            override suspend fun history(baseUrl: String, symbol: String, range: ChartRange): StockHistory = throw FeedHttpException(429)
+        }
+        val state = CachedStockRepository(source).refresh(settings, now)
+        assertTrue(state.online)
+        assertTrue(state.error!!.contains("HTTP 503"))
+        assertFalse(state.error!!.contains("offline", ignoreCase = true))
+        assertTrue(state.historyErrors.getValue(settings.featured to settings.range).contains("HTTP 429"))
+    }
+
 }

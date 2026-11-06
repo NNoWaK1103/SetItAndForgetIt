@@ -24,6 +24,9 @@ import com.openticker.app.ui.components.*
 import com.openticker.app.ui.theme.*
 import com.openticker.app.util.sortedGames
 import com.openticker.app.viewmodel.*
+import java.time.Instant
+import java.time.LocalDate
+import kotlinx.coroutines.delay
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -64,6 +67,10 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable private fun LeagueColumn(league: League, feed: LeagueState?, online: Boolean, modifier: Modifier = Modifier) {
+    val now by produceState(Instant.now()) { while(true) { value = Instant.now(); delay(30_000) } }
+    val oldDate = feed?.updated?.atZone(ZoneId.of("America/New_York"))?.toLocalDate()?.let {
+        it != now.atZone(ZoneId.of("America/New_York")).toLocalDate()
+    } == true
     Column(modifier.clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha=.025f)).padding(10.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) {
             LeagueIcon(league)
@@ -78,13 +85,23 @@ import java.time.format.DateTimeFormatter
                 },color=Muted,fontSize=8.sp,letterSpacing=.7.sp)
             }
         }
-        Text(feed?.updated?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("'Updated' h:mm:ss a")) ?: "Awaiting feed",color=Muted,fontSize=10.sp)
-        feed?.error?.let { Text(it,color=Color(0xFFFFCA82),fontSize=10.sp) }
+        Text(feed?.updated?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("'Updated' MMM d, h:mm:ss a")) ?: "Awaiting feed",color=Muted,fontSize=10.sp)
+        val warning = when {
+            !online -> if(feed?.updated == null) "Network offline · no saved scores" else "Network offline · saved scores"
+            feed?.error != null -> feed.error
+            feed?.restored == true -> "Saved scores · awaiting refresh"
+            oldDate -> "Older scoreboard · awaiting today's feed"
+            feed?.updated?.let { now.epochSecond - it.epochSecond > 300 } == true -> "Scores update overdue"
+            else -> null
+        }
+        warning?.let { Text(it,color=Color(0xFFFFCA82),fontSize=10.sp) }
         val games=remember(feed?.games) { sortedGames(feed?.games.orEmpty()) }
         LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp),contentPadding=PaddingValues(bottom=8.dp)) {
             if(games.isEmpty()) item {
                 Text(when {
-                    feed?.updated!=null -> "No ${league.name} games scheduled today."
+                    feed?.updated!=null -> if(oldDate || feed.restored || !online || feed.error != null)
+                        "No games in the saved scoreboard. Check the update date above."
+                        else "No ${league.name} games scheduled today."
                     feed?.error!=null -> "Scores unavailable. Retrying automatically."
                     !online -> "Waiting for a connection."
                     else -> "Loading ${league.name} scores…"

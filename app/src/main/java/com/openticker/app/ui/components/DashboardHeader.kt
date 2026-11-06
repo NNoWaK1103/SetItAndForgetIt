@@ -23,7 +23,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable fun DashboardHeader(online: Boolean, healthy: Boolean, slide: DashboardSlide, paused: Boolean,
+@Composable fun DashboardHeader(online: Boolean, slide: DashboardSlide, paused: Boolean,
     onSelect: (DashboardSlide) -> Unit, onTogglePlayback: () -> Unit,
     settingsLoaded: Boolean = true, onSettings: () -> Unit) {
     val now by produceState(ZonedDateTime.now()) { while(true) { value = ZonedDateTime.now(); delay(1000) } }
@@ -46,7 +46,7 @@ import java.util.Locale
             Text(now.format(DateTimeFormatter.ofPattern("h:mm:ss a",Locale.US)),fontSize=18.sp,fontWeight=FontWeight.Medium)
             Text(now.format(DateTimeFormatter.ofPattern("EEE, MMM d",Locale.US)),color=Muted,fontSize=10.sp)
         }
-        Text(if(!online) "● OFFLINE" else if(!healthy) "● CONNECTING" else "● CONNECTED", color=if(online && healthy) Mint else Color(0xFFFFCA82),fontSize=9.sp)
+        Text(if(!online) "● NETWORK OFFLINE" else "● NETWORK ONLINE", color=if(online) Mint else Color(0xFFFFCA82),fontSize=9.sp)
         TextButton(onClick=onSettings,enabled=settingsLoaded) { Text("Settings",color=Ice,fontSize=12.sp) }
     }
 }

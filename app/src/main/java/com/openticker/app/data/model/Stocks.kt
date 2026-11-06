@@ -1,5 +1,8 @@
+@file:kotlinx.serialization.UseSerializers(com.openticker.app.data.repository.InstantSerializer::class)
+
 package com.openticker.app.data.model
 
+import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.Locale
 
@@ -34,6 +37,7 @@ fun stockCompany(symbol: String) = STOCK_COMPANIES.find { it.symbol == symbol }
 fun normalizeStockSymbol(value: String): String? = value.trim().uppercase(Locale.US)
     .takeIf { it.matches(Regex("[A-Z][A-Z0-9]{0,9}(\\.[A-Z])?")) }
 
+@Serializable
 data class StockQuote(
     val symbol: String, val price: Double? = null, val previousClose: Double? = null,
     val high: Double? = null, val low: Double? = null, val volume: Long? = null,
@@ -43,7 +47,9 @@ data class StockQuote(
     val change: Double? get() = price?.let { p -> previousClose?.let { p - it } }
     val changePercent: Double? get() = change?.let { delta -> previousClose?.takeIf { it > 0 }?.let { delta / it * 100 } }
 }
+@Serializable
 data class StockHistoricalPoint(val time: Instant, val close: Double)
+@Serializable
 data class StockHistory(val points: List<StockHistoricalPoint> = emptyList(), val message: String? = null,
     val freshness: QuoteFreshness = QuoteFreshness.UNAVAILABLE, val updated: Instant? = null, val pending: Boolean = false,
     val feedLabel: String? = null)
