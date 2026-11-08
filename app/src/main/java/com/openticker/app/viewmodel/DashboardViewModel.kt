@@ -15,8 +15,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import java.time.Instant
+import java.time.LocalDate
 
-data class LeagueState(val games: List<Game> = emptyList(), val updated: Instant? = null, val error: String? = null, val restored: Boolean = false)
+data class LeagueState(val games: List<Game> = emptyList(), val updated: Instant? = null, val error: String? = null, val restored: Boolean = false,
+    val scheduleDate: LocalDate? = null, val loading: Boolean = false)
 data class DashboardState(
     val settings: AppSettings = AppSettings(), val settingsLoaded: Boolean = false,
     val scores: Map<League, LeagueState> = emptyMap(), val weather: Weather? = null,
@@ -39,12 +41,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val slideshow = slideshowController.state
     private val refreshMutex = Mutex()
     private var searchJob: Job? = null
-    private val sportsAttempts = mutableMapOf<League, Instant>()
+    private val sportsAttempts = mutableMapOf<League, SportsScheduleAttempt>()
     private var weatherAttempt: Pair<Location, Instant>? = null
     init {
+        // Re-evaluate freshness and the Eastern date without changing saved settings or polling.
+        val scheduleClock = MutableStateFlow(Instant.now())
+        viewModelScope.launch {
+            active.collectLatest { visible ->
+                scheduleClock.value = Instant.now()
+                if (visible) while (currentCoroutineContext().isActive) {
+                    delay(1_000)
+                    scheduleClock.value = Instant.now()
+                }
+            }
+        }
+        viewModelScope.launch {
+            combine(state, scheduleClock) { current, now ->
+                if (current.settingsLoaded) sportsPlaybackSettings(current.settings, current.scores, current.online, now) else null
+            }.filterNotNull().distinctUntilChanged().collect { slideshowController.configure(it) }
+        }
         viewModelScope.launch {
             store.settings.collect { settings ->
-                slideshowController.configure(settings)
                 val old = state.value
                 val changed = !old.settingsLoaded || old.settings.location != settings.location
                 val savedWeather = if (changed) cache.read<WeatherSnapshot>(weatherCacheKey(settings.location))?.takeIf {
@@ -75,6 +92,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     fun setActive(value: Boolean) { active.value = value; slideshowController.setForeground(value) }
+    fun setPlaybackInteraction(held: Boolean) { slideshowController.setInteractionHeld(held) }
     fun selectSlide(slide: DashboardSlide) { slideshowController.select(slide) }
     fun toggleSlideshow() { viewModelScope.launch {
         try { store.toggleSlideshowPaused(); mutable.update { it.copy(settingsError = null) } }
@@ -103,18 +121,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val previous = snapshot.scores[league]
                     val seconds = if (previous?.error != null || previous?.games?.any { it.status == GameStatus.LIVE } == true)
                         snapshot.settings.sportsRefreshSeconds else maxOf(180, snapshot.settings.sportsRefreshSeconds)
-                    if (!force && sportsAttempts[league]?.let { now.epochSecond - it.epochSecond < seconds } == true) return@mapNotNull null
-                    if (!force && previous?.restored != true && previous?.updated != null && now.epochSecond - previous.updated.epochSecond < seconds) return@mapNotNull null
-                    sportsAttempts[league] = now
+                    if (!force && !isSportsScheduleRefreshDue(previous, sportsAttempts[league], now, seconds)) return@mapNotNull null
+                    val scheduleDate = sportsScheduleDate(now)
+                    sportsAttempts[league] = SportsScheduleAttempt(scheduleDate, now)
                     launch {
                         try {
-                            val games = sports.scoreboard(league)
+                            mutable.update { it.copy(scores = it.scores + (league to (it.scores[league] ?: LeagueState()).copy(loading = true))) }
+                            val games = sports.scoreboard(league, scheduleDate)
                             val updated = Instant.now()
-                            mutable.update { it.copy(scores = it.scores + (league to LeagueState(games, updated))) }
+                            mutable.update { it.copy(scores = it.scores + (league to LeagueState(games, updated, scheduleDate = scheduleDate))) }
                             cache.write(sportsCacheKey(league), ScoreSnapshot(games, updated))
                         } catch (e: CancellationException) { sportsAttempts.remove(league); throw e }
                         catch (e: Exception) {
                             mutable.update { it.copy(scores = it.scores + (league to (it.scores[league] ?: LeagueState()).copy(error = feedFailureMessage(e, league.name)))) }
+                        } finally {
+                            mutable.update { it.copy(scores = it.scores + (league to (it.scores[league] ?: LeagueState()).copy(loading = false))) }
                         }
                     }
                 }

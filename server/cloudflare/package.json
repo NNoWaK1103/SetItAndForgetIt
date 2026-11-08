@@ -3,11 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test worker.test.mjs",
+    "test": "node --test worker.test.mjs runtime-check.mjs",
     "check": "wrangler deploy --dry-run --outdir .wrangler/build",
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "verify": "node verify-deployment.mjs"
   },
-  "devDependencies": { "wrangler": "4.156.0" },
-  "engines": { "node": ">=22" }
+  "devDependencies": {
+    "wrangler": "4.156.0",
+    "miniflare": "5.20261023.3-beta"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

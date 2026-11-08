@@ -36,6 +36,7 @@ class CachedStockRepository(private val source: StockDataSource, private val cac
     private val mutex = Mutex()
     private var state = StockMarketUiState()
     private var baseUrl = ""
+    private var credentialRevision = -1
     private var quoteConfig: Pair<List<String>, Set<MarketIndex>>? = null
     private var quoteDue = Instant.MIN
     private var quoteFailures = 0
@@ -44,10 +45,16 @@ class CachedStockRepository(private val source: StockDataSource, private val cac
     private val historyFailures = mutableMapOf<Pair<String, ChartRange>, Int>()
 
     private suspend fun selectProvider(settings: StockSettings) {
-        if (baseUrl == settings.proxyUrl) return
+        if (baseUrl == settings.proxyUrl) {
+            if (credentialRevision != settings.credentialRevision) {
+                credentialRevision = settings.credentialRevision
+                quoteDue = Instant.MIN; quoteFailures = 0; historyDue.clear(); historyFailures.clear()
+            }
+            return
+        }
         // Read before committing the provider switch so cancellation cannot skip restoration.
         val saved = if (settings.proxyUrl.isNotBlank()) cache?.read<StoredStockMarket>("stocks:${settings.proxyUrl}") else null
-        baseUrl = settings.proxyUrl; state = StockMarketUiState(); quoteDue = Instant.MIN
+        baseUrl = settings.proxyUrl; credentialRevision = settings.credentialRevision; state = StockMarketUiState(); quoteDue = Instant.MIN
         quoteConfig = null; quoteFailures = 0; historyDue.clear(); historyFailures.clear(); savedHistories = emptyMap()
         if (baseUrl.isNotBlank()) {
             saved?.let { saved ->

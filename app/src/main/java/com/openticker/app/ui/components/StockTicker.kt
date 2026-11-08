@@ -10,8 +10,16 @@ import com.openticker.app.settings.StockSettings
 import com.openticker.app.util.stockTickerText
 
 @Composable fun StockTicker(state: StockMarketUiState, settings: StockSettings, animate: Boolean, position: MutableFloatState) {
-    val message = remember(state.quotes, state.staleSymbols, state.online, settings) {
+    val message = remember(state.quotes, state.staleSymbols, state.online, state.configured, state.error, settings) {
         buildAnnotatedString {
+            if(!state.configured) {
+                append("Stock data not configured · add your HTTPS market-data proxy in Settings")
+                return@buildAnnotatedString
+            }
+            if(state.quotes.isEmpty()) {
+                append(state.error ?: if(state.online) "Waiting for market quotes" else "Offline · no saved market quotes")
+                return@buildAnnotatedString
+            }
             settings.quoteSymbols().forEachIndexed { i, symbol ->
                 if(i>0) append("     |     ")
                 val quote = state.quotes[symbol]

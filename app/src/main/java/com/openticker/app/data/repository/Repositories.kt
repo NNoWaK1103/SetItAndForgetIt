@@ -4,19 +4,33 @@ import com.openticker.app.data.model.*
 import com.openticker.app.data.remote.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-interface SportsRepository { suspend fun scoreboard(league: League): List<Game> }
+interface SportsRepository {
+    suspend fun scoreboard(league: League, scheduleDate: LocalDate = LocalDate.now(ZoneId.of("America/New_York"))): List<Game>
+}
+
+// A malformed nonempty response must never masquerade as a confirmed empty schedule.
+internal fun parseReliableScoreboard(body: String, league: League): List<Game> {
+    val games = EspnParser.parse(body, league)
+    require(games.isNotEmpty() || Json.parseToJsonElement(body).jsonObject.getValue("events").jsonArray.isEmpty()) {
+        "Scoreboard events could not be read"
+    }
+    return games
+}
 class EspnSportsRepository(private val http: HttpClient) : SportsRepository {
-    override suspend fun scoreboard(league: League): List<Game> = withContext(Dispatchers.Default) {
+    override suspend fun scoreboard(league: League, scheduleDate: LocalDate): List<Game> = withContext(Dispatchers.Default) {
         val url = "https://site.api.espn.com/apis/site/v2/sports/${league.path}/scoreboard".toHttpUrl().newBuilder()
-            .addQueryParameter("dates", LocalDate.now(ZoneId.of("America/New_York")).format(DateTimeFormatter.BASIC_ISO_DATE))
+            .addQueryParameter("dates", scheduleDate.format(DateTimeFormatter.BASIC_ISO_DATE))
             .addQueryParameter("limit", "1000")
         if (league == League.NCAAF) url.addQueryParameter("groups", "80")
-        EspnParser.parse(http.get(url.build()), league)
+        parseReliableScoreboard(http.get(url.build()), league)
     }
 }
 interface WeatherRepository {

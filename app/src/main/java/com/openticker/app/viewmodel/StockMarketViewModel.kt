@@ -15,7 +15,7 @@ import java.io.File
 
 class StockMarketViewModel(application: Application) : AndroidViewModel(application) {
     private val store = SettingsStore(application)
-    private val repository: StockRepository = CachedStockRepository(ProxyStockDataSource(HttpClient()),
+    private val repository: StockRepository = CachedStockRepository(ProxyStockDataSource(StockProxyHttpClient(store::proxyToken)),
         LastGoodCache(File(application.filesDir, "last-good")))
     private val active = MutableStateFlow(false)
     private val mutable = MutableStateFlow(StockMarketUiState())

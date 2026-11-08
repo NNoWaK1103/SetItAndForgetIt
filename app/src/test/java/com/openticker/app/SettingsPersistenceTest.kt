@@ -32,9 +32,11 @@ class SettingsPersistenceTest {
                 override suspend fun readFrom(source: BufferedSource) = PreferencesFileSerializer.readFrom(source.inputStream())
                 override suspend fun writeTo(t: Preferences, sink: BufferedSink) = PreferencesFileSerializer.writeTo(t,sink.outputStream())
             }, producePath={produceFile().toOkioPath()}))
-    @Test fun `fresh store defaults to fifteen second weather first automatic slideshow`() = runTest {
+    @Test fun `fresh store defaults to Philadelphia and fifteen second sports first slideshow`() = runTest {
         val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"defaults.preferences_pb")})
         assertEquals(AppSettings(),SettingsStore(data).settings.first())
+        assertEquals("Philadelphia",SettingsStore(data).settings.first().location.name)
+        assertEquals(DashboardSlide.SPORTS,SettingsStore(data).settings.first().startSlide)
         assertEquals(15,SettingsStore(data).settings.first().slideshowIntervalSeconds)
     }
     @Test fun `all preferences survive closing and reopening a real DataStore file`() = runTest {
@@ -43,7 +45,7 @@ class SettingsPersistenceTest {
             leagues=setOf(League.NBA,League.NHL),sportsRefreshSeconds=60,tickerEnabled=false,keepAwake=false,
             slideshowIntervalSeconds=30,slideshowPaused=true,startSlide=DashboardSlide.SPORTS,
             weatherTickerEnabled=false,animationsEnabled=false,sportsGroupA=setOf(League.NBA,League.NHL),
-            sportsGroupB=setOf(League.NFL,League.NCAAF,League.MLB),activeSportsGroup=SportsGroup.B,tickerAllLeagues=true,
+            sportsGroupB=setOf(League.NFL,League.NCAAF,League.MLB),activeSportsGroup=SportsGroup.B,tickerAllLeagues=true,sportsAutoBrowse=false,persistentMarketTicker=false,
             enabledScreens=listOf(DashboardSlide.STOCKS,DashboardSlide.SPORTS),
             stocks=StockSettings(featured="MSFT",watchlist=listOf("HD","AAPL","BRK.B"),categories=setOf(StockCategory.FINANCIAL,StockCategory.RETAIL),
                 range=ChartRange.YEAR,tickerEnabled=false,refreshSeconds=300,rotate=false,indices=setOf(MarketIndex.DOW),proxyUrl="https://example.com/market"))
@@ -55,6 +57,13 @@ class SettingsPersistenceTest {
         firstJob.cancelAndJoin()
         val reopened=SettingsStore(testStore(scope=backgroundScope,produceFile={file}))
         assertEquals(expected,reopened.settings.first())
+    }
+    @Test fun `saved city and weather startup are not overwritten by Philly defaults`() = runTest {
+        val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"saved-weather-start.preferences_pb")})
+        val store=SettingsStore(data)
+        val custom=AppSettings(location=Location("Hatboro","Pennsylvania",40.1743,-75.1068),startSlide=DashboardSlide.WEATHER)
+        store.save(custom)
+        assertEquals(custom,SettingsStore(data).settings.first())
     }
     @Test fun `old preferences retain location units leagues and sports ticker choice`() = runTest {
         val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"legacy.preferences_pb")})
@@ -68,17 +77,18 @@ class SettingsPersistenceTest {
         assertEquals("Boston",restored.location.name);assertTrue(restored.celsius)
         assertEquals(setOf(League.NBA),restored.leagues);assertFalse(restored.tickerEnabled)
         assertTrue(restored.weatherTickerEnabled);assertEquals(15,restored.slideshowIntervalSeconds)
-        assertEquals(DashboardSlide.WEATHER,restored.startSlide)
+        assertEquals(DashboardSlide.SPORTS,restored.startSlide)
         assertEquals(DEFAULT_GROUP_A,restored.sportsGroupA);assertEquals(DEFAULT_GROUP_B,restored.sportsGroupB)
         assertEquals(SportsGroup.A,restored.activeSportsGroup);assertFalse(restored.tickerAllLeagues)
         assertEquals(DashboardSlide.entries.toList(),restored.enabledScreens)
         assertEquals(StockSettings(),restored.stocks)
+        assertTrue(restored.sportsAutoBrowse);assertTrue(restored.persistentMarketTicker)
     }
     @Test fun `invalid stored interval and start slide fall back safely`() = runTest {
         val data=testStore(scope=backgroundScope,produceFile={File(folder.root,"invalid.preferences_pb")})
         data.edit { it[intPreferencesKey("slideshow_interval")]=0;it[stringPreferencesKey("start_slide")]="UNKNOWN" }
         val restored=SettingsStore(data).settings.first()
-        assertEquals(15,restored.slideshowIntervalSeconds);assertEquals(DashboardSlide.WEATHER,restored.startSlide)
+        assertEquals(15,restored.slideshowIntervalSeconds);assertEquals(DashboardSlide.SPORTS,restored.startSlide)
     }
     @Test fun `selecting a group changes only its preference and survives reopening`() = runTest {
         val file=File(folder.root,"active-group.preferences_pb")
@@ -152,5 +162,39 @@ class SettingsPersistenceTest {
         assertEquals(original.copy(slideshowIntervalSeconds=20,slideshowPaused=true),store.settings.first())
         store.toggleSlideshowPaused()
         assertEquals(original.copy(slideshowIntervalSeconds=20),store.settings.first())
+    }
+    @Test fun `proxy credentials are encrypted scoped and cleared atomically on URL changes`() = runTest {
+        val file=File(folder.root,"credentials.preferences_pb")
+        val data=testStore(backgroundScope) { file }
+        val cipher=object : ProxyTokenCipher {
+            override fun encrypt(token: String, scope: String): String { require(validProxyToken(token)); return "ciphertext:$scope" }
+            override fun decrypt(encrypted: String, scope: String): String {
+                require(encrypted == "ciphertext:$scope"); return "a".repeat(64)
+            }
+        }
+        val store=SettingsStore(data,cipher)
+        val value=AppSettings(stocks=StockSettings(proxyUrl="https://example.com/market",accessTokenEdit=ProxyTokenEdit("a".repeat(64))))
+        store.save(value)
+        assertEquals("a".repeat(64),store.proxyToken("https://example.com/market/"))
+        assertNull(store.proxyToken("https://example.com/other"))
+        assertNull(store.proxyToken("https://evil.example/market"))
+        assertNull(store.settings.first().stocks.accessTokenEdit)
+        assertTrue(store.settings.first().stocks.accessTokenConfigured)
+        assertFalse(data.data.first().toString().contains("a".repeat(64)))
+        assertFalse(file.readText().contains("a".repeat(64)))
+        val saved=store.settings.first()
+        store.save(saved.copy(celsius=true))
+        assertEquals("a".repeat(64),store.proxyToken(saved.stocks.proxyUrl))
+        store.save(saved.copy(stocks=saved.stocks.copy(proxyUrl="https://another.example")))
+        assertNull(store.proxyToken(saved.stocks.proxyUrl))
+        assertNull(store.proxyToken("https://another.example"))
+        assertFalse(store.settings.first().stocks.accessTokenConfigured)
+        store.save(value)
+        val before=store.settings.first()
+        try { store.save(before.copy(celsius=true,stocks=before.stocks.copy(accessTokenEdit=ProxyTokenEdit("bad")))); fail() }
+        catch(_: IllegalArgumentException) { }
+        assertEquals(before,store.settings.first())
+        store.save(before.copy(stocks=before.stocks.copy(accessTokenEdit=ProxyTokenEdit(""))))
+        assertNull(store.proxyToken(before.stocks.proxyUrl))
     }
 }

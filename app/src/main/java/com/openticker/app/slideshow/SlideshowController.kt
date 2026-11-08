@@ -33,6 +33,7 @@ class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Lo
         data class Configure(val settings: AppSettings) : Event
         data class Foreground(val visible: Boolean) : Event
         data class Select(val slide: DashboardSlide) : Event
+        data class Interaction(val held: Boolean) : Event
     }
     private val events = Channel<Event>(Channel.UNLIMITED)
     private val mutable = MutableStateFlow(SlideshowState())
@@ -43,6 +44,7 @@ class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Lo
             var configured = false
             var foreground = false
             var paused = false
+            var interactionHeld = false
             var intervalMillis = DEFAULT_SLIDESHOW_INTERVAL_SECONDS * 1_000L
             var remainingMillis = intervalMillis
             var slide = DashboardSlide.WEATHER
@@ -50,7 +52,7 @@ class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Lo
             var manualSelection = false
             while (isActive) {
                 val canAdvance = enabled.size > 1 || (enabled.size == 1 && slide !in enabled)
-                val running = configured && foreground && !paused && canAdvance
+                val running = configured && foreground && !paused && !interactionHeld && canAdvance
                 val started = nowMillis()
                 // Receive and deadline compete in one select, so a timeout cannot consume and discard a tab press.
                 val event = if (running) select<Event?> {
@@ -71,14 +73,16 @@ class SlideshowController(scope: CoroutineScope, private val nowMillis: () -> Lo
                         configured = true
                     }
                     is Event.Foreground -> foreground = event.visible
+                    is Event.Interaction -> interactionHeld = event.held
                     is Event.Select -> { slide = event.slide; manualSelection = true; remainingMillis = intervalMillis }
                 }
-                val playing = configured && foreground && !paused && (enabled.size > 1 || (enabled.size == 1 && slide !in enabled))
+                val playing = configured && foreground && !paused && !interactionHeld && (enabled.size > 1 || (enabled.size == 1 && slide !in enabled))
                 mutable.value = SlideshowState(slide, playing, enabled, enabled.isNotEmpty() || manualSelection)
             }
         }
     }
     fun configure(settings: AppSettings) { events.trySend(Event.Configure(settings)) }
+    fun setInteractionHeld(held: Boolean) { events.trySend(Event.Interaction(held)) }
     fun setForeground(visible: Boolean) { events.trySend(Event.Foreground(visible)) }
     /** A manual selection gets a full interval before the next automatic switch. */
     fun select(slide: DashboardSlide) { events.trySend(Event.Select(slide)) }

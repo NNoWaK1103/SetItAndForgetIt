@@ -80,6 +80,16 @@ class StockTest {
         val chart=StockParser.history("""{"points":[{"time":"2026-10-29T13:30:00Z","close":400}],"freshness":"REALTIME","feedLabel":"IEX only"}""")
         assertEquals("IEX only",chart.feedLabel)
     }
+    @Test fun `completed daily fallback displays its original date and never claims live data`() {
+        val quote=StockParser.snapshot("""{"quotes":[{"symbol":"HD","price":411,"previousClose":null,"updated":"2026-11-06T05:00:00Z","freshness":"PREVIOUS_CLOSE","feedLabel":"IEX only","delayMinutes":null}]}""").quotes.getValue("HD")
+        assertEquals(411.0,quote.price!!,.001)
+        assertNull(quote.change);assertNull(quote.changePercent)
+        assertEquals(Instant.parse("2026-11-06T05:00:00Z"),quote.updated)
+        assertEquals("Previous close · IEX only",stockFreshness(quote))
+        val ticker=stockTickerText("HD",quote,true)
+        assertTrue(ticker.contains("Nov 6"));assertTrue(ticker.endsWith("STALE"))
+        assertFalse(ticker.contains("Real-time"));assertFalse(ticker.contains("Delayed"))
+    }
     private inner class Source : StockDataSource {
         var snapshotCalls=0;var historyCalls=0;var fail=false;var missing=false;var session=MarketSession.OPEN;var cancel=false;var quota=60;var historyPending=false
         override suspend fun snapshot(baseUrl: String,symbols: List<String>,indices: Set<MarketIndex>): StockSnapshot {

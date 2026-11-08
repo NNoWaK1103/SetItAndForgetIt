@@ -4,12 +4,16 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-10-30",
   "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
   "durable_objects": {
     "bindings": [{ "name": "MARKET_CACHE", "class_name": "MarketDataCache" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MarketDataCache"] }],
   "vars": {
     "ALPACA_FEED": "iex",
+    "PROXY_REQUESTS_PER_MINUTE": "60",
+    "PROXY_REQUESTS_PER_DAY": "10000",
     "ALPACA_TRADING_BASE_URL": "https://api.alpaca.markets",
     "ALPACA_REQUESTS_PER_MINUTE": "60",
     "MASSIVE_REQUESTS_PER_MINUTE": "5",

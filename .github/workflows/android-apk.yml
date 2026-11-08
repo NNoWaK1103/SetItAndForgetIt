@@ -35,6 +35,7 @@ jobs:
         working-directory: server/cloudflare
         run: |
           npm ci
+          npm test
           npm run check
       - name: Reuse debug signing identity for tablet updates
         uses: actions/cache@v4
@@ -42,7 +43,7 @@ jobs:
           path: ~/.android/debug.keystore
           key: openticker-debug-signing-v1
       - name: Test, lint, and build APK
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+        run: ./gradlew --no-daemon testDebugUnitTest testDashboardPreviewUnitTest lintDebug lintDashboardPreview assembleDebug assembleDashboardPreview
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v5
@@ -56,5 +57,12 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 90
+      - name: Upload isolated GUI preview APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: OpenTicker-gui-preview-apk
+          path: app/build/outputs/apk/dashboardPreview/app-dashboardPreview.apk
+          if-no-files-found: error
+          retention-days: 90
       - name: Record APK checksum
-        run: sha256sum app/build/outputs/apk/debug/app-debug.apk >> "$GITHUB_STEP_SUMMARY"
+        run: sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/dashboardPreview/app-dashboardPreview.apk >> "$GITHUB_STEP_SUMMARY"

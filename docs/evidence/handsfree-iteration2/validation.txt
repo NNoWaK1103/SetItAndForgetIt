@@ -1,0 +1,32 @@
+Hands-free second iteration — 2026-11-07
+
+Source baseline: a5c726a (first professional dashboard preview).
+Work branch: feature/professional-live-dashboard.
+Remote main rechecked at 0008c2d before work. Previous local reliability and first-preview commits preserved. No remote publication.
+
+Final command:
+./gradlew --no-daemon --max-workers=4 -Pkotlin.compiler.execution.strategy=in-process testDebugUnitTest lintDebug assembleDebug testDashboardPreviewUnitTest lintDashboardPreview assembleDashboardPreview
+BUILD SUCCESSFUL in 1m 24s; 102 tasks, 34 executed and 68 up-to-date.
+Debug unit tests: 142 passed, zero failures/errors/skips.
+DashboardPreview unit tests: 142 passed, zero failures/errors/skips.
+Debug lint: zero errors, 9 warnings.
+DashboardPreview lint: zero errors, 11 warnings.
+Warnings remain dependency/tool update notices and existing Android orientation/data-extraction guidance. No warning suppression was introduced.
+
+Backend tests: node --test server/*.test.mjs server/cloudflare/*.test.mjs
+34 passed; zero failures, cancelled or skipped.
+Worker bundle: npm --prefix server/cloudflare run check passed (dry-run only, no deployment).
+
+New coverage includes continuous stock paging, 500-symbol/category/HD handling, viewport/font-scale capacities, short visible visits, pause/hold and manual navigation; game briefs and saved-live captions; network vs service health, missing/stale indices, overdue thresholds and manual Stocks navigation when automatic Stocks is disabled.
+
+Independent code review found and resolved compact stock line-height overflow and index completeness omissions. Final recheck found no blocking issue. Source-derived normal-font layout budgets: 144dp quote cards, 8dp row gaps, 203dp compact featured overview. Explicit line heights were also applied to sports and weather. These are not rendered screenshots.
+
+git diff --check passed. Both normal and isolated-preview APKs assembled; only preview is distributed.
+Preview package: com.openticker.app.dashboardpreview
+Label: OpenTicker Preview
+Version: 1.4.1-preview (versionCode 8)
+APK SHA-256: 21c295e0d2cf3d66852c47a21cff1c50814167d4b50d9b20a681266ee5169f38
+Signer SHA-256: 59281a268f988edcefa260a56d898f7a9a2ec9d9145cfb0d5649ab5d6508b6a8
+APK v2 signature verified. Package and signer match first preview; versionCode increases from 7 to 8. This preserves compatibility with that preview's update path. No physical install was performed.
+
+Unverified: physical-tablet installation/rendering, screenshots, enlarged-font behavior, sustained runtime, and live market-provider end-to-end responses. No active stock proxy/credentials/paid entitlement is assumed. No microphone permission or voice commands were added. No main merge, push, deployment, hardware access, uninstall or data clearing.

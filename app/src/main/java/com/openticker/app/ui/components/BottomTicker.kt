@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,8 +44,10 @@ import java.time.ZoneId
     val content: @Composable (TickerContent) -> Unit = { selected ->
         val enabled = when(selected) { TickerContent.SPORTS -> state.settings.tickerEnabled; TickerContent.WEATHER -> state.settings.weatherTickerEnabled; TickerContent.STOCKS -> state.settings.stocks.tickerEnabled }
         Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically) {
-            Text(when(selected) { TickerContent.SPORTS -> "SCORE WIRE"; TickerContent.WEATHER -> "WEATHER WIRE"; TickerContent.STOCKS -> "MARKET WIRE" },color=SportsBackground,fontSize=11.sp,fontWeight=FontWeight.ExtraBold,
-                modifier=Modifier.width(126.dp).fillMaxHeight().background(if(selected==TickerContent.SPORTS) Mint else Ice).wrapContentSize(Alignment.Center))
+            Text("●  " + when(selected) { TickerContent.SPORTS -> "SCORE WIRE"; TickerContent.WEATHER -> "WEATHER WIRE"; TickerContent.STOCKS -> "MARKET WIRE" },color=TextStrong,fontSize=10.sp,fontWeight=FontWeight.ExtraBold,
+                modifier=Modifier.width(132.dp).fillMaxHeight().background(Color(0xFF125659),GenericShape { size, _ ->
+                    moveTo(0f,0f);lineTo(size.width-16f,0f);lineTo(size.width,size.height/2);lineTo(size.width-16f,size.height);lineTo(0f,size.height);close()
+                }).wrapContentSize(Alignment.Center))
             Box(Modifier.weight(1f).fillMaxHeight().padding(horizontal=16.dp),contentAlignment=Alignment.CenterStart) {
                 if(!enabled) Text("${selected.name.lowercase().replaceFirstChar { it.uppercase() }} ticker disabled",color=Muted,fontSize=14.sp)
                 else if(selected==TickerContent.SPORTS) SportsTicker(state,state.settings.animationsEnabled,sportsPosition)
@@ -53,9 +56,20 @@ import java.time.ZoneId
             }
         }
     }
-    Box(Modifier.fillMaxWidth().height(60.dp).background(Color(0xFF080C13))) {
-        if(state.settings.animationsEnabled) Crossfade(type,animationSpec=tween(500),label="ticker-content") { content(it) }
-        else content(type)
+    Column(Modifier.fillMaxWidth().background(SportsBackground).border(1.dp,Border)) {
+        Box(Modifier.fillMaxWidth().height(50.dp)) {
+            if(state.settings.animationsEnabled) Crossfade(type,animationSpec=tween(500),label="ticker-content") { content(it) }
+            else content(type)
+        }
+        if(state.settings.persistentMarketTicker && state.settings.stocks.tickerEnabled && slide != DashboardSlide.STOCKS) {
+            Row(Modifier.fillMaxWidth().height(32.dp).background(Panel),verticalAlignment=Alignment.CenterVertically) {
+                Text("MARKET WIRE",color=Ice,fontSize=10.sp,fontWeight=FontWeight.Bold,
+                    modifier=Modifier.width(126.dp).padding(start=15.dp))
+                Box(Modifier.weight(1f).fillMaxHeight().padding(horizontal=16.dp),contentAlignment=Alignment.CenterStart) {
+                    StockTicker(stocks,state.settings.stocks,state.settings.animationsEnabled,stockPosition)
+                }
+            }
+        }
     }
 }
 @Composable private fun SportsTicker(state: DashboardState, animate: Boolean, position: MutableFloatState) {
@@ -88,7 +102,7 @@ import java.time.ZoneId
 
 /** Measured once per update; frame changes invalidate drawing, not composition or text layout. */
 @Composable internal fun TickerLine(message: AnnotatedString, animate: Boolean, position: MutableFloatState) {
-    val style=TextStyle(fontSize=16.sp,color=Color(0xFFDCE5F3),fontWeight=FontWeight.Medium)
+    val style=TextStyle(fontSize=16.sp,color=TextStrong,fontWeight=FontWeight.Medium)
     if(!animate) {
         Text(message,style=style,maxLines=1,softWrap=false,modifier=Modifier.horizontalScroll(rememberScrollState()))
         return

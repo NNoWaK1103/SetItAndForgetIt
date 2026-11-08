@@ -6,22 +6,89 @@ const FEEDS={iex:{freshness:'REALTIME',feedLabel:'IEX only'},sip:{freshness:'REA
 const positive=n=>typeof n==='number' && Number.isFinite(n) && n>0 ? n : null;
 const time=s=>typeof s==='string' && /T.*(?:Z|[+-]\d{2}:\d{2})$/.test(s) && Number.isFinite(Date.parse(s)) ? new Date(s).toISOString() : null;
 const date=n=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(n));
-const json=(body,status=200,headers={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
+const json=(body,status=200,headers={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...headers}});
 const unavailable=symbol=>({symbol,price:null,freshness:'UNAVAILABLE',updated:null});
+function completedDailyQuote(symbol,item,info,now) {
+  const today=date(now);
+  // A current-day bar can still be partial. Only a prior Eastern date is a
+  // completed-day fallback; retain the provider's original bar timestamp.
+  const bars=['dailyBar','prevDailyBar'].flatMap(key=>{
+    const bar=item?.[key],updated=time(bar?.t);
+    return positive(bar?.c) && updated && Date.parse(updated)<=now && date(Date.parse(updated))<today ? [{key,bar,updated}] : [];
+  }).sort((a,b)=>Date.parse(b.updated)-Date.parse(a.updated));
+  const latest=bars[0];
+  if(!latest) return null;
+  const previous=latest.key==='dailyBar' ? bars.find(b=>b.key==='prevDailyBar' && date(Date.parse(b.updated))<date(Date.parse(latest.updated))) : null;
+  return {symbol,price:latest.bar.c,previousClose:previous?.bar.c ?? null,
+    high:positive(latest.bar.h),low:positive(latest.bar.l),volume:Number.isFinite(latest.bar.v) && latest.bar.v>=0?latest.bar.v:null,
+    updated:latest.updated,freshness:'PREVIOUS_CLOSE',feedLabel:info.feedLabel,delayMinutes:null};
+}
 class InputError extends Error {}
 class ProviderError extends Error {
   constructor(retrySeconds=60) {super('Market provider unavailable');this.retrySeconds=retrySeconds;}
 }
 
+// A tablet-only credential, never the Alpaca key. User creates it during deployment.
+// Authenticate at both boundaries. No health, method or route leaks before authentication.
+export function authorize(request,env) {
+  const expected=env.PROXY_ACCESS_TOKEN;
+  if(typeof expected!=='string' || !/^[a-f0-9]{64}$/.test(expected))
+    return json({error:'Private stock connection is not configured'},503,{'Retry-After':'60'});
+  const authorization=request.headers.get('Authorization') ?? '';
+  const supplied=/^Bearer ([a-f0-9]{64})$/.exec(authorization)?.[1] ?? '';
+  // Fixed-size compare, with no prefix-dependent early exit.
+  let mismatch=supplied.length ^ expected.length;
+  for(let i=0;i<64;i++) mismatch|=(supplied.charCodeAt(i)||0)^expected.charCodeAt(i);
+  if(mismatch) return json({error:'Stock connection access denied'},401,{'WWW-Authenticate':'Bearer realm="OpenTicker"'});
+  return null;
+}
+
+function validateRequest(request) {
+  const url=new URL(request.url);
+  if(url.protocol!=='https:' || url.username || url.password || url.hash)
+    return json({error:'HTTPS required'},400);
+  if(request.url.length>2048) return json({error:'Request too long'},414);
+  if(request.method!=='GET') return json({error:'Method not allowed'},405,{Allow:'GET'});
+  const parameters={
+    '/health':[], '/v1/quotes':['symbols','indices'],
+    '/v1/history':['symbol','range'], '/v1/indices':['symbols']
+  }[url.pathname];
+  if(!parameters) return json({error:'Not found'},404);
+  for(const key of url.searchParams.keys()) {
+    if(!parameters.includes(key) || url.searchParams.getAll(key).length!==1)
+      return json({error:'Invalid query parameters'},400);
+  }
+  return null;
+}
+
 export class MarketDataService {
-  constructor(storage,env,{fetcher=fetch,now=()=>Date.now()}={}) {
+  constructor(storage,env,{fetcher=(...args)=>fetch(...args),now=()=>Date.now()}={}) {
     this.storage=storage;this.env=env;this.fetcher=fetcher;this.now=now;
     // One named Durable Object serializes clients; storage survives isolate restarts.
     this.tail=Promise.resolve();
   }
   fetch(request) {
+    const denied=authorize(request,this.env) ?? validateRequest(request);
+    if(denied) return Promise.resolve(denied);
     const result=this.tail.then(()=>this.handle(request));
     this.tail=result.catch(()=>{});return result;
+  }
+  async clientBudget() {
+    const now=this.now(),day=new Date(now).toISOString().slice(0,10);
+    const minuteLimit=Number(this.env.PROXY_REQUESTS_PER_MINUTE ?? 60);
+    const dailyLimit=Number(this.env.PROXY_REQUESTS_PER_DAY ?? 10000);
+    if(!Number.isInteger(minuteLimit) || minuteLimit<1 || minuteLimit>600 ||
+      !Number.isInteger(dailyLimit) || dailyLimit<1 || dailyLimit>100000)
+      return json({error:'Invalid private request budget'},503);
+    const budget=await this.storage.get('quota:client') ?? {times:[],day,count:0};
+    budget.times=budget.times.filter(t=>t>now-60000);
+    if(budget.day!==day) {budget.day=day;budget.count=0;}
+    if(budget.times.length>=minuteLimit || budget.count>=dailyLimit) {
+      const retry=budget.count>=dailyLimit?Math.ceil((Date.parse(day)+86400000-now)/1000):Math.ceil((budget.times[0]+60001-now)/1000);
+      return json({error:'Private stock request budget reached'},429,{'Retry-After':String(Math.max(1,retry))});
+    }
+    budget.times.push(now);budget.count++;await this.storage.put('quota:client',budget);
+    return null;
   }
   symbols(value,indices=false) {
     const list=[...new Set((value ?? '').split(',').filter(Boolean))].sort();
@@ -44,7 +111,7 @@ export class MarketDataService {
     for(const [k,v] of Object.entries(params)) url.searchParams.set(k,String(v));
     const headers=provider==='alpaca'?{'APCA-API-KEY-ID':this.env.ALPACA_API_KEY_ID,'APCA-API-SECRET-KEY':this.env.ALPACA_API_SECRET_KEY}:{Authorization:`Bearer ${this.env.MASSIVE_API_KEY}`};
     let response;
-    try {response=await this.fetcher(url,{method:'GET',redirect:'error',headers,signal:AbortSignal.timeout(8000)});}
+    try {response=await this.fetcher(url,{method:'GET',redirect:'manual',headers,signal:AbortSignal.timeout(8000)});}
     catch {throw new ProviderError();}
     const responseNow=this.now(),retry=response.headers.get('Retry-After');
     const retryAt=retry && /^\d+$/.test(retry)?responseNow+Number(retry)*1000:Date.parse(retry ?? '');
@@ -53,6 +120,7 @@ export class MarketDataService {
       budget.blockedUntil=Math.max(responseNow+60_000,Number.isFinite(retryAt)?retryAt:0,Number.isFinite(resetAt)?resetAt:0)+100;
       await this.storage.put(key,budget);
     }
+    // Workers does not implement redirect:error. Manual + non-2xx rejection never follows Location.
     if(!response.ok) throw new ProviderError(Math.max(60,Math.ceil((budget.blockedUntil-responseNow)/1000)));
     let body;try {body=await response.json();} catch {throw new ProviderError();}
     if(!body || typeof body!=='object' || body.status==='ERROR' || body.status==='NOT_AUTHORIZED' || 'code' in body && 'message' in body) throw new ProviderError();
@@ -97,9 +165,11 @@ export class MarketDataService {
         const item=body[symbol],trade=item?.latestTrade,minute=item?.minuteBar;
         const point=positive(trade?.p) && time(trade?.t)?{price:trade.p,updated:time(trade.t)}:positive(minute?.c) && time(minute?.t)?{price:minute.c,updated:time(minute.t)}:null;
         if(!point) {
-          const previous=old?.quotes.find(q=>q.symbol===symbol && q.price);
-          if(previous) {retained.push(symbol);return previous;}
-          return unavailable(symbol);
+          const daily=completedDailyQuote(symbol,item,info,this.now());
+          const previous=old?.quotes.find(q=>q.symbol===symbol && positive(q.price) && time(q.updated));
+          // A daily fallback must not replace a newer known quote with older data.
+          if(previous && (!daily || Date.parse(previous.updated)>Date.parse(daily.updated))) {retained.push(symbol);return previous;}
+          return daily ?? unavailable(symbol);
         }
         return {symbol,...point,previousClose:positive(item.prevDailyBar?.c),high:positive(item.dailyBar?.h),low:positive(item.dailyBar?.l),volume:item.dailyBar?.v ?? null,...info};
       });
@@ -144,6 +214,8 @@ export class MarketDataService {
   }
   async handle(request) {
     try {
+      const budgetDenied=await this.clientBudget();
+      if(budgetDenied) return budgetDenied;
       const url=new URL(request.url);
       if(request.method!=='GET') return json({error:'Method not allowed'},405,{Allow:'GET'});
       if(url.pathname==='/health') return json({service:'OpenTicker market proxy',configured:!!(this.env.ALPACA_API_KEY_ID && this.env.ALPACA_API_SECRET_KEY && FEEDS[this.env.ALPACA_FEED ?? 'iex'] && this.env.MARKET_DISPLAY_LICENSE_CONFIRMED==='true'),indicesConfigured:!!this.env.MASSIVE_API_KEY});
@@ -178,6 +250,8 @@ export class MarketDataCache {
 export default {
   async fetch(request,env) {
     try {
+      const denied=authorize(request,env) ?? validateRequest(request);
+      if(denied) return denied;
       const id=env.MARKET_CACHE.idFromName('openticker-market-v1');
       return await env.MARKET_CACHE.get(id).fetch(request);
     } catch {return json({error:'Market service temporarily unavailable'},503,{'Retry-After':'60'});}

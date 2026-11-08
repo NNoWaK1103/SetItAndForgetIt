@@ -15,17 +15,29 @@ enum class League(val path: String) {
 }
 enum class GameStatus { LIVE, FINAL, UPCOMING, POSTPONED, CANCELED, UNKNOWN }
 @Serializable
-data class Team(val name: String, val abbreviation: String, val logo: String? = null)
+data class Team(
+    val name: String, val abbreviation: String, val logo: String? = null,
+    val id: String? = null, val record: String? = null, val rank: Int? = null
+)
+@Serializable
+data class GameSituation(
+    val possessionTeamId: String? = null, val downDistance: String? = null,
+    val balls: Int? = null, val strikes: Int? = null, val outs: Int? = null,
+    val onFirst: Boolean? = null, val onSecond: Boolean? = null, val onThird: Boolean? = null,
+    val lastPlay: String? = null
+)
 @Serializable
 data class Game(
     val id: String, val league: League, val away: Team, val home: Team,
     val awayScore: Int?, val homeScore: Int?, val status: GameStatus,
-    val start: Instant?, val period: Int?, val clock: String?, val detail: String
+    val start: Instant?, val period: Int?, val clock: String?, val detail: String,
+    val venue: String? = null, val broadcasts: List<String> = emptyList(),
+    val situation: GameSituation? = null
 )
 @Serializable
 data class Location(val name: String, val region: String, val latitude: Double, val longitude: Double) {
     val label: String get() = listOf(name, region).filter { it.isNotBlank() }.joinToString(", ")
-    companion object { val DEFAULT = Location("Hatboro", "Pennsylvania", 40.1743, -75.1068) }
+    companion object { val DEFAULT = Location("Philadelphia", "Pennsylvania", 39.9526, -75.1652) }
 }
 @Serializable
 data class HourWeather(val time: LocalDateTime, val temperatureF: Double?, val code: Int?, val rain: Int?)

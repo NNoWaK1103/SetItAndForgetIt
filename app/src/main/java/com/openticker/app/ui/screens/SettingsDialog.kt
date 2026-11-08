@@ -7,6 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openticker.app.data.model.*
@@ -22,8 +25,11 @@ import com.openticker.app.viewmodel.DashboardState
     var featured by remember { mutableStateOf(draft.stocks.featured) }
     var watchlist by remember { mutableStateOf(draft.stocks.watchlist.joinToString(", ")) }
     var proxy by remember { mutableStateOf(draft.stocks.proxyUrl) }
+    var token by remember { mutableStateOf("") }
+    var clearToken by remember { mutableStateOf(false) }
+    val tokenValid = token.isEmpty() || validProxyToken(token)
     val parsedWatchlist = watchlist.split(',', ' ', '\n').filter { it.isNotBlank() }
-    val stocksValid = normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=MAX_STOCK_WATCHLIST_SIZE && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
+    val stocksValid = tokenValid && normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=MAX_STOCK_WATCHLIST_SIZE && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
     val dismiss = { if (!state.settingsSaving) onDismiss() }
     AlertDialog(onDismissRequest=dismiss, title={ Text("Make it yours") },
         text={ CompositionLocalProvider(LocalSettingsEnabled provides !state.settingsSaving) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -60,6 +66,8 @@ import com.openticker.app.viewmodel.DashboardState
             state.searchResults.forEach { location -> TextButton(enabled=LocalSettingsEnabled.current,onClick={draft=draft.copy(location=location)}) { Text(location.label,fontSize=12.sp) } }
             SettingToggle("Celsius (°C)",draft.celsius) {draft=draft.copy(celsius=it)}
             Text("Sports groups",color=Mint,fontSize=13.sp)
+            SettingToggle("Hands-free sports pages and groups",draft.sportsAutoBrowse) {draft=draft.copy(sportsAutoBrowse=it)}
+            Text("Auto browse advances every 10 seconds while Sports is visible, and continues where it stopped on the next visit. Pause stops browsing too.",color=Muted,fontSize=11.sp)
             Text("Choose the group to show after saving. Group changes leave the slideshow timer running.",color=Muted,fontSize=11.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { SportsGroup.entries.forEach { group ->
                 FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.activeSportsGroup==group,onClick={draft=draft.copy(activeSportsGroup=group)},label={Text("Group ${group.name}")})
@@ -71,7 +79,7 @@ import com.openticker.app.viewmodel.DashboardState
                 }
             }
             SettingToggle("All five leagues in sports ticker",draft.tickerAllLeagues) {draft=draft.copy(tickerAllLeagues=it)}
-            Text("By default, the score wire follows the selected group. All-five mode also includes disabled feeds in the ticker. Groups switch manually.",color=Muted,fontSize=11.sp)
+            Text("By default, the score wire follows the selected group. All-five mode also includes disabled feeds in the ticker. Hands-free browsing can also cycle through both groups.",color=Muted,fontSize=11.sp)
             Text("Enabled sports feeds",color=Mint,fontSize=13.sp)
             Text("Disabled feeds are hidden in both dashboard groups.",color=Muted,fontSize=11.sp)
             LeagueSelection(draft.leagues) {draft=draft.copy(leagues=it)}
@@ -96,8 +104,9 @@ import com.openticker.app.viewmodel.DashboardState
             Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { ChartRange.entries.forEach { range ->
                 FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.stocks.range==range,onClick={draft=draft.copy(stocks=draft.stocks.copy(range=range))},label={Text(range.label,fontSize=11.sp)})
             } }
+            SettingToggle("Market wire on every screen",draft.persistentMarketTicker) {draft=draft.copy(persistentMarketTicker=it)}
             SettingToggle("Stock ticker",draft.stocks.tickerEnabled) {draft=draft.copy(stocks=draft.stocks.copy(tickerEnabled=it))}
-            SettingToggle("Rotate stock cards on each stock-screen visit",draft.stocks.rotate) {draft=draft.copy(stocks=draft.stocks.copy(rotate=it))}
+            SettingToggle("Hands-free stock pages and price history",draft.stocks.rotate) {draft=draft.copy(stocks=draft.stocks.copy(rotate=it))}
             Text("Stock refresh (provider limits may lengthen this)",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { STOCK_REFRESH_INTERVALS.forEach { seconds ->
                 FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.stocks.refreshSeconds==seconds,onClick={draft=draft.copy(stocks=draft.stocks.copy(refreshSeconds=seconds))},label={Text("${seconds/60}m",fontSize=11.sp)})
@@ -108,10 +117,18 @@ import com.openticker.app.viewmodel.DashboardState
             }
             OutlinedTextField(enabled=LocalSettingsEnabled.current,value=proxy,onValueChange={proxy=it},label={Text("Market-data proxy HTTPS URL")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=proxy.isNotBlank() && !validStockProxy(proxy.trim()))
             Text("Use your own proxy's HTTPS URL. Alpaca's API URL is an upstream service, not a proxy. Provider credentials stay on your server.",color=Muted,fontSize=11.sp)
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=token,onValueChange={token=it; clearToken=false},
+                label={Text("Worker access token (not Alpaca keys)")},singleLine=true,
+                visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
+                modifier=Modifier.fillMaxWidth(),isError=!tokenValid)
+            Text(if(draft.stocks.accessTokenConfigured) "A protected token is saved. Leave blank to keep it for this URL. Changing the URL removes it unless you enter a replacement."
+                else "Enter the Worker's 64-character lowercase hexadecimal access token. Stocks will not connect without it. Weather and sports need no token.",color=Muted,fontSize=11.sp)
+            SettingToggle("Remove saved Worker access token",clearToken) { clearToken=it; if(it) token="" }
+            if(!tokenValid) Text("The Worker access token must be 64 lowercase hexadecimal characters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             if(!stocksValid) Text("Check the featured symbol, watchlist (maximum 500), and HTTPS URL without credentials or query parameters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             SettingToggle("Keep screen awake",draft.keepAwake) {draft=draft.copy(keepAwake=it)}
         } } },
-        confirmButton={TextButton(enabled=stocksValid && !state.settingsSaving,onClick={onSave(draft.copy(stocks=draft.stocks.copy(featured=featured,watchlist=parsedWatchlist,proxyUrl=proxy).normalized()))}) {Text(if(state.settingsSaving) "Saving…" else "Save settings")}},
+        confirmButton={TextButton(enabled=stocksValid && !state.settingsSaving,onClick={onSave(draft.copy(stocks=draft.stocks.copy(featured=featured,watchlist=parsedWatchlist,proxyUrl=proxy,accessTokenEdit=if(clearToken) ProxyTokenEdit("") else token.takeIf { it.isNotEmpty() }?.let(::ProxyTokenEdit)).normalized()))}) {Text(if(state.settingsSaving) "Saving…" else "Save settings")}},
         dismissButton={TextButton(enabled=!state.settingsSaving,onClick=dismiss) {Text("Cancel")}})
 }
 private val LocalSettingsEnabled = staticCompositionLocalOf { true }
