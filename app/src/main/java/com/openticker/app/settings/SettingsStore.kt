@@ -8,6 +8,7 @@ import com.openticker.app.data.model.*
 import com.openticker.app.slideshow.DashboardSlide
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import java.io.IOException
 
 private val Context.settingsDataStore by preferencesDataStore("openticker_settings")
@@ -20,20 +21,22 @@ data class AppSettings(
     val keepAwake: Boolean = true,
     val slideshowIntervalSeconds: Int = DEFAULT_SLIDESHOW_INTERVAL_SECONDS,
     val slideshowPaused: Boolean = false,
-    val startSlide: DashboardSlide = DashboardSlide.WEATHER,
+    val startSlide: DashboardSlide = DashboardSlide.SPORTS,
     val weatherTickerEnabled: Boolean = true,
     val animationsEnabled: Boolean = true,
     val sportsGroupA: Set<League> = DEFAULT_GROUP_A,
     val sportsGroupB: Set<League> = DEFAULT_GROUP_B,
     val activeSportsGroup: SportsGroup = SportsGroup.A,
     val tickerAllLeagues: Boolean = false,
+    val sportsAutoBrowse: Boolean = true,
+    val persistentMarketTicker: Boolean = true,
     val enabledScreens: List<DashboardSlide> = DashboardSlide.entries.toList(),
     val stocks: StockSettings = StockSettings()
 )
 const val DEFAULT_SLIDESHOW_INTERVAL_SECONDS = 15
 val SLIDESHOW_INTERVALS = listOf(5, 10, 15, 20, 30, 60)
 val PRIMARY_SLIDESHOW_INTERVALS = listOf(10, 15, 20)
-class SettingsStore(private val store: DataStore<Preferences>) {
+class SettingsStore(private val store: DataStore<Preferences>, private val tokenCipher: ProxyTokenCipher = AndroidProxyTokenCipher()) {
     constructor(context: Context) : this(context.applicationContext.settingsDataStore)
     private object Keys {
         val name = stringPreferencesKey("city"); val region = stringPreferencesKey("region")
@@ -50,6 +53,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val groupB = stringSetPreferencesKey("sports_group_b")
         val activeGroup = stringPreferencesKey("active_sports_group")
         val tickerAll = booleanPreferencesKey("ticker_all_leagues")
+        val sportsAutoBrowse = booleanPreferencesKey("sports_auto_browse")
+        val persistentMarketTicker = booleanPreferencesKey("persistent_market_ticker")
         val screens = stringPreferencesKey("enabled_screens_order")
         val featured = stringPreferencesKey("stock_featured")
         val watchlist = stringPreferencesKey("stock_watchlist")
@@ -60,6 +65,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val stockRotate = booleanPreferencesKey("stock_rotate")
         val indices = stringSetPreferencesKey("stock_indices")
         val proxy = stringPreferencesKey("stock_proxy_url")
+        val encryptedToken = stringPreferencesKey("stock_proxy_token_ciphertext")
+        val credentialRevision = intPreferencesKey("stock_proxy_credential_revision")
     }
     val settings = store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }.map { p ->
         AppSettings(location = Location(p[Keys.name] ?: Location.DEFAULT.name, p[Keys.region] ?: Location.DEFAULT.region,
@@ -70,13 +77,15 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             tickerEnabled = p[Keys.ticker] ?: true, keepAwake = p[Keys.awake] ?: true,
             slideshowIntervalSeconds = p[Keys.interval]?.takeIf { it in SLIDESHOW_INTERVALS } ?: DEFAULT_SLIDESHOW_INTERVAL_SECONDS,
             slideshowPaused = p[Keys.paused] ?: false,
-            startSlide = DashboardSlide.entries.find { it.name == p[Keys.start] } ?: DashboardSlide.WEATHER,
+            startSlide = DashboardSlide.entries.find { it.name == p[Keys.start] } ?: DashboardSlide.SPORTS,
             weatherTickerEnabled = p[Keys.weatherTicker] ?: true,
             animationsEnabled = p[Keys.animations] ?: true,
             sportsGroupA = p[Keys.groupA]?.let { names -> League.entries.filter { it.name in names }.toSet() } ?: DEFAULT_GROUP_A,
             sportsGroupB = p[Keys.groupB]?.let { names -> League.entries.filter { it.name in names }.toSet() } ?: DEFAULT_GROUP_B,
             activeSportsGroup = SportsGroup.entries.find { it.name == p[Keys.activeGroup] } ?: SportsGroup.A,
             tickerAllLeagues = p[Keys.tickerAll] ?: false,
+            sportsAutoBrowse = p[Keys.sportsAutoBrowse] ?: true,
+            persistentMarketTicker = p[Keys.persistentMarketTicker] ?: true,
             enabledScreens = p[Keys.screens]?.let { value -> value.split(',').mapNotNull { name -> DashboardSlide.entries.find { it.name == name } }.distinct() }
                 ?: DashboardSlide.entries.toList(),
             stocks = StockSettings(
@@ -87,7 +96,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                 tickerEnabled = p[Keys.stockTicker] ?: true, refreshSeconds = p[Keys.stockRefresh] ?: 60,
                 rotate = p[Keys.stockRotate] ?: true,
                 indices = p[Keys.indices]?.let { names -> MarketIndex.entries.filter { it.name in names }.toSet() } ?: MarketIndex.entries.toSet(),
-                proxyUrl = p[Keys.proxy] ?: "").normalized())
+                proxyUrl = p[Keys.proxy] ?: "",
+                accessTokenConfigured = !p[Keys.encryptedToken].isNullOrBlank(),
+                credentialRevision = p[Keys.credentialRevision] ?: 0).normalized())
     }
     suspend fun save(value: AppSettings) { store.edit { p ->
         p[Keys.name] = value.location.name; p[Keys.region] = value.location.region
@@ -100,14 +111,33 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         p[Keys.groupA] = value.sportsGroupA.map { it.name }.toSet()
         p[Keys.groupB] = value.sportsGroupB.map { it.name }.toSet()
         p[Keys.activeGroup] = value.activeSportsGroup.name; p[Keys.tickerAll] = value.tickerAllLeagues
+        p[Keys.sportsAutoBrowse] = value.sportsAutoBrowse; p[Keys.persistentMarketTicker] = value.persistentMarketTicker
         p[Keys.screens] = value.enabledScreens.distinct().joinToString(",") { it.name }
         val stocks = value.stocks.normalized()
         p[Keys.featured] = stocks.featured; p[Keys.watchlist] = stocks.watchlist.joinToString(",")
         p[Keys.categories] = stocks.categories.map { it.name }.toSet(); p[Keys.range] = stocks.range.name
         p[Keys.stockTicker] = stocks.tickerEnabled; p[Keys.stockRefresh] = stocks.refreshSeconds
         p[Keys.stockRotate] = stocks.rotate; p[Keys.indices] = stocks.indices.map { it.name }.toSet()
+        val previousScope = p[Keys.proxy]?.takeIf { validStockProxy(it) }?.let(::proxyCredentialScope)
+        val nextScope = stocks.proxyUrl.takeIf { it.isNotBlank() }?.let(::proxyCredentialScope)
+        val edit = stocks.accessTokenEdit
+        if (edit != null || previousScope != nextScope) {
+            val hadToken = !p[Keys.encryptedToken].isNullOrBlank()
+            val encrypted = if (nextScope != null && edit != null && edit.value.isNotEmpty())
+                tokenCipher.encrypt(edit.value, nextScope) else null
+            if (encrypted == null) p.remove(Keys.encryptedToken) else p[Keys.encryptedToken] = encrypted
+            if (hadToken || edit != null) p[Keys.credentialRevision] = (p[Keys.credentialRevision] ?: 0) + 1
+        }
         p[Keys.proxy] = stocks.proxyUrl
     } }
+    suspend fun proxyToken(baseUrl: String): String? {
+        val p = store.data.first()
+        val saved = p[Keys.proxy] ?: return null
+        if (!validStockProxy(saved) || !validStockProxy(baseUrl) || proxyCredentialScope(saved) != proxyCredentialScope(baseUrl)) return null
+        val encrypted = p[Keys.encryptedToken] ?: return null
+        return try { tokenCipher.decrypt(encrypted, proxyCredentialScope(saved)) }
+        catch (_: Exception) { null }
+    }
     suspend fun selectSportsGroup(group: SportsGroup) { store.edit { it[Keys.activeGroup] = group.name } }
     suspend fun selectStockRange(range: ChartRange) { store.edit { it[Keys.range] = range.name } }
     suspend fun selectSlideshowInterval(seconds: Int) {

@@ -1,0 +1,37 @@
+Professional dashboard preview validation — 2026-11-07
+
+Baseline: origin/main 0008c2d664abfd5c7a2e93130d7f3bb1e56f4eca (fetched before and after implementation)
+Preserved original local reliability branch at 85cea79.
+Work branch: feature/professional-live-dashboard
+
+Final aggregate command:
+./gradlew --no-daemon --max-workers=4 -Pkotlin.compiler.execution.strategy=in-process testDebugUnitTest lintDebug assembleDebug testDashboardPreviewUnitTest lintDashboardPreview assembleDashboardPreview
+Result: BUILD SUCCESSFUL, 1m 54s, 102 tasks (67 executed, 35 up-to-date).
+JDK 17, Gradle 8.13, AGP 8.13.2, SDK 36.
+
+Debug unit tests: 118 passed, 0 failures, 0 errors, 0 skipped.
+DashboardPreview unit tests: 118 passed, 0 failures, 0 errors, 0 skipped.
+Debug lint: 0 errors, 9 warnings.
+DashboardPreview lint: 0 errors, 11 warnings.
+Warnings concern available dependency/tool updates and existing fixed-orientation/data-extraction configuration. No warning was suppressed for this build.
+Both APK variants assembled. Only the isolated preview is distributed.
+
+node --test server/*.test.mjs server/cloudflare/*.test.mjs
+Result: 34 passed, 0 failed, 0 skipped.
+Cloudflare npm run check: Worker bundle dry-run passed, no deployment or credentials used.
+One read-only ESPN college-football scoreboard smoke request returned a valid events array (63 games) with venue, broadcast, records and curatedRank fields. No guarantee of uninterrupted provider service is implied.
+
+Independent review initially caught short-visit sports timer starvation and compact weather overflow. Both were fixed, covered by pure timing tests and re-reviewed. No remaining code-review blockers. Added defaulted fields preserve legacy saved-score decoding; preference tests cover new defaults and reopening saved files.
+
+APK identity: com.openticker.app.dashboardpreview
+Launcher: OpenTicker Preview
+Version: 1.4.0-preview (7)
+APK SHA-256: 4dc228a6bfefdc5c0da958a0417b02b058f92fe3f1f86a235ad6319ac7367539
+Verified v2 APK signature.
+Current signer SHA-256: 59281a268f988edcefa260a56d898f7a9a2ec9d9145cfb0d5649ab5d6508b6a8
+Earlier local reliability APK signer SHA-256: 79e23d9383db9d672535a88342c7e37e003efbedc291e1b6b9f04609defc428b
+The mismatch is why this is an isolated preview, not an update that would replace the existing app. Never uninstall the existing app to work around it.
+
+git diff --check passed. No push, PR, merge, deployment or physical-tablet action.
+
+Not verified: installing on the user's tablet, Android rendering/screenshots, accessibility at enlarged font scales, live stock-provider responses, prolonged screen/battery/network behavior. KVM is unavailable; retained-emulator cold-boot failures from the preceding task were not repeated. Source-layout review is not visual QA.

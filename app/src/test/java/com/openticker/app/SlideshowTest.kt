@@ -11,14 +11,14 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SlideshowTest {
-    private fun TestScope.controller(settings: AppSettings = AppSettings(slideshowIntervalSeconds=10)): SlideshowController =
+    private fun TestScope.controller(settings: AppSettings = AppSettings(slideshowIntervalSeconds=10,startSlide=DashboardSlide.WEATHER)): SlideshowController =
         SlideshowController(backgroundScope) { testScheduler.currentTime }.also {
             it.configure(settings);it.setForeground(true);runCurrent()
         }
     @Test fun `default playback gives all three dashboards fifteen seconds over repeated cycles`() = runTest {
         val c=controller(AppSettings())
         repeat(9) { index ->
-            val expected=DashboardSlide.entries[index%3]
+            val expected=listOf(DashboardSlide.SPORTS,DashboardSlide.STOCKS,DashboardSlide.WEATHER)[index%3]
             assertEquals(expected,c.state.value.slide)
             advanceTimeBy(14_999);runCurrent();assertEquals(expected,c.state.value.slide)
             advanceTimeBy(1);runCurrent();assertEquals(expected.next(),c.state.value.slide)
@@ -137,7 +137,7 @@ class SlideshowTest {
     }
     @Test fun `ten fifteen and twenty second settings drive full three screen cycles`() = runTest {
         for(seconds in listOf(10,15,20)) {
-            val c=controller(AppSettings(slideshowIntervalSeconds=seconds))
+            val c=controller(AppSettings(slideshowIntervalSeconds=seconds,startSlide=DashboardSlide.WEATHER))
             val screens=DashboardSlide.entries
             repeat(6) { index ->
                 advanceTimeBy(seconds*1_000L-1);runCurrent();assertEquals(screens[index%3],c.state.value.slide)
@@ -194,4 +194,24 @@ class SlideshowTest {
             c.select(DashboardSlide.WEATHER);runCurrent()
         }
     }
+    @Test fun `opening details holds remaining time without changing saved pause`() = runTest {
+        val c=controller()
+        advanceTimeBy(4_000);c.setInteractionHeld(true);runCurrent()
+        advanceTimeBy(60_000);runCurrent()
+        assertEquals(DashboardSlide.WEATHER,c.state.value.slide);assertFalse(c.state.value.playing)
+        c.configure(AppSettings(slideshowIntervalSeconds=10));runCurrent()
+        assertFalse(c.state.value.playing)
+        c.setInteractionHeld(false);runCurrent()
+        advanceTimeBy(5_999);runCurrent();assertEquals(DashboardSlide.WEATHER,c.state.value.slide)
+        advanceTimeBy(1);runCurrent();assertEquals(DashboardSlide.SPORTS,c.state.value.slide)
+    }
+    @Test fun `closing details does not unpause playback or override background`() = runTest {
+        val c=controller()
+        c.setInteractionHeld(true);c.configure(AppSettings(slideshowIntervalSeconds=10,slideshowPaused=true));runCurrent()
+        c.setInteractionHeld(false);advanceTimeBy(60_000);runCurrent();assertFalse(c.state.value.playing)
+        c.setForeground(false);c.configure(AppSettings(slideshowIntervalSeconds=10));runCurrent()
+        c.setInteractionHeld(true);c.setInteractionHeld(false);advanceTimeBy(60_000);runCurrent()
+        assertEquals(DashboardSlide.WEATHER,c.state.value.slide);assertFalse(c.state.value.playing)
+    }
+
 }

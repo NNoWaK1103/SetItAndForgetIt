@@ -7,6 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openticker.app.data.model.*
@@ -16,16 +19,20 @@ import com.openticker.app.ui.theme.*
 import com.openticker.app.viewmodel.DashboardState
 
 @Composable fun SettingsDialog(state: DashboardState, onSearch: (String) -> Unit, onSave: (AppSettings) -> Unit,
-    onInterval: (Int) -> Unit, onDismiss: () -> Unit) {
+    onDismiss: () -> Unit) {
     var draft by remember { mutableStateOf(state.settings) }
     var query by remember { mutableStateOf("") }
     var featured by remember { mutableStateOf(draft.stocks.featured) }
     var watchlist by remember { mutableStateOf(draft.stocks.watchlist.joinToString(", ")) }
     var proxy by remember { mutableStateOf(draft.stocks.proxyUrl) }
+    var token by remember { mutableStateOf("") }
+    var clearToken by remember { mutableStateOf(false) }
+    val tokenValid = token.isEmpty() || validProxyToken(token)
     val parsedWatchlist = watchlist.split(',', ' ', '\n').filter { it.isNotBlank() }
-    val stocksValid = normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=MAX_STOCK_WATCHLIST_SIZE && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
-    AlertDialog(onDismissRequest=onDismiss, title={ Text("Make it yours") },
-        text={ Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    val stocksValid = tokenValid && normalizeStockSymbol(featured)!=null && parsedWatchlist.size<=MAX_STOCK_WATCHLIST_SIZE && parsedWatchlist.all { normalizeStockSymbol(it)!=null } && (proxy.isBlank() || validStockProxy(proxy.trim()))
+    val dismiss = { if (!state.settingsSaving) onDismiss() }
+    AlertDialog(onDismissRequest=dismiss, title={ Text("Make it yours") },
+        text={ CompositionLocalProvider(LocalSettingsEnabled provides !state.settingsSaving) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Text("Automatic slideshow",color=Mint,fontSize=13.sp)
             Text("Enabled screens (in playback order)",color=Mint,fontSize=13.sp)
             DashboardSlide.entries.forEach { slide ->
@@ -38,30 +45,32 @@ import com.openticker.app.viewmodel.DashboardState
             Text("Time on each screen",color=Mint,fontSize=13.sp)
             listOf(PRIMARY_SLIDESHOW_INTERVALS,SLIDESHOW_INTERVALS-PRIMARY_SLIDESHOW_INTERVALS.toSet()).forEach { intervals ->
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { intervals.forEach { seconds ->
-                    FilterChip(selected=draft.slideshowIntervalSeconds==seconds,onClick={
-                        draft=draft.copy(slideshowIntervalSeconds=seconds);onInterval(seconds)
+                    FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.slideshowIntervalSeconds==seconds,onClick={
+                        draft=draft.copy(slideshowIntervalSeconds=seconds)
                     },label={Text("${seconds}s",fontSize=12.sp)})
                 } }
             }
-            Text("Interval changes apply immediately and are saved, including when you close this dialog with Cancel. Other settings use Save settings.",color=Muted,fontSize=11.sp)
+            Text("All changes apply together with Save settings. Cancel, Back, or tapping outside discards your changes.",color=Muted,fontSize=11.sp)
             state.settingsError?.let { Text(it,color=MaterialTheme.colorScheme.error,fontSize=12.sp) }
             Text("Start on",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { DashboardSlide.entries.forEach { slide ->
-                FilterChip(selected=draft.startSlide==slide,onClick={draft=draft.copy(startSlide=slide)},label={Text(slide.label)})
+                FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.startSlide==slide,onClick={draft=draft.copy(startSlide=slide)},label={Text(slide.label)})
             } }
             Text("The start screen applies next time the app launches. Manual switches get a full display interval.",color=Muted,fontSize=11.sp)
             SettingToggle("Animations and ticker scrolling",draft.animationsEnabled) {draft=draft.copy(animationsEnabled=it)}
             Text("Weather location",color=Mint,fontSize=13.sp)
             Text(draft.location.label,fontSize=13.sp)
-            OutlinedTextField(value=query,onValueChange={query=it; onSearch(it)},label={Text("City or ZIP code")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=query,onValueChange={query=it; onSearch(it)},label={Text("City or ZIP code")},singleLine=true,modifier=Modifier.fillMaxWidth())
             if(state.searching) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.searchError?.let { Text(it,color=MaterialTheme.colorScheme.error,fontSize=12.sp) }
-            state.searchResults.forEach { location -> TextButton(onClick={draft=draft.copy(location=location)}) { Text(location.label,fontSize=12.sp) } }
+            state.searchResults.forEach { location -> TextButton(enabled=LocalSettingsEnabled.current,onClick={draft=draft.copy(location=location)}) { Text(location.label,fontSize=12.sp) } }
             SettingToggle("Celsius (°C)",draft.celsius) {draft=draft.copy(celsius=it)}
             Text("Sports groups",color=Mint,fontSize=13.sp)
-            Text("Select a group now. Group changes leave the slideshow timer running.",color=Muted,fontSize=11.sp)
+            SettingToggle("Hands-free sports pages and groups",draft.sportsAutoBrowse) {draft=draft.copy(sportsAutoBrowse=it)}
+            Text("Auto browse advances every 10 seconds while Sports is visible, and continues where it stopped on the next visit. Pause stops browsing too.",color=Muted,fontSize=11.sp)
+            Text("Choose the group to show after saving. Group changes leave the slideshow timer running.",color=Muted,fontSize=11.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { SportsGroup.entries.forEach { group ->
-                FilterChip(selected=draft.activeSportsGroup==group,onClick={draft=draft.copy(activeSportsGroup=group)},label={Text("Group ${group.name}")})
+                FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.activeSportsGroup==group,onClick={draft=draft.copy(activeSportsGroup=group)},label={Text("Group ${group.name}")})
             } }
             SportsGroup.entries.forEach { group ->
                 Text("Group ${group.name} leagues",color=Mint,fontSize=12.sp)
@@ -70,59 +79,70 @@ import com.openticker.app.viewmodel.DashboardState
                 }
             }
             SettingToggle("All five leagues in sports ticker",draft.tickerAllLeagues) {draft=draft.copy(tickerAllLeagues=it)}
-            Text("By default, the score wire follows the selected group. All-five mode also includes disabled feeds in the ticker. Groups switch manually.",color=Muted,fontSize=11.sp)
+            Text("By default, the score wire follows the selected group. All-five mode also includes disabled feeds in the ticker. Hands-free browsing can also cycle through both groups.",color=Muted,fontSize=11.sp)
             Text("Enabled sports feeds",color=Mint,fontSize=13.sp)
             Text("Disabled feeds are hidden in both dashboard groups.",color=Muted,fontSize=11.sp)
             LeagueSelection(draft.leagues) {draft=draft.copy(leagues=it)}
             Text("Live sports refresh",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) { listOf(30,60,120,300).forEach { seconds ->
-                FilterChip(selected=draft.sportsRefreshSeconds==seconds,onClick={draft=draft.copy(sportsRefreshSeconds=seconds)},label={Text(if(seconds<60) "${seconds}s" else "${seconds/60}m",fontSize=11.sp)})
+                FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.sportsRefreshSeconds==seconds,onClick={draft=draft.copy(sportsRefreshSeconds=seconds)},label={Text(if(seconds<60) "${seconds}s" else "${seconds/60}m",fontSize=11.sp)})
             } }
             Text("Quiet scoreboards refresh at least every 3 minutes. Weather refreshes every 15 minutes.",color=Muted,fontSize=11.sp)
             SettingToggle("Sports ticker on weather screen",draft.tickerEnabled) {draft=draft.copy(tickerEnabled=it)}
             SettingToggle("Weather ticker on sports screen",draft.weatherTickerEnabled) {draft=draft.copy(weatherTickerEnabled=it)}
             Text("Stock market",color=Mint,fontSize=13.sp)
-            OutlinedTextField(value=featured,onValueChange={featured=it},label={Text("Featured ticker (default HD)")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=normalizeStockSymbol(featured)==null)
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=featured,onValueChange={featured=it},label={Text("Featured ticker (default HD)")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=normalizeStockSymbol(featured)==null)
             Text("Home Depot always stays visible, including when you feature another company.",color=Muted,fontSize=11.sp)
-            OutlinedTextField(value=watchlist,onValueChange={watchlist=it},label={Text("Watchlist symbols, separated by commas")},modifier=Modifier.fillMaxWidth(),minLines=2)
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=watchlist,onValueChange={watchlist=it},label={Text("Watchlist symbols, separated by commas")},modifier=Modifier.fillMaxWidth(),minLines=2)
             Text("Up to 500 symbols; e.g. AAPL, MSFT, BRK.B. Custom symbols use the Other category.",color=Muted,fontSize=11.sp)
             StockCategory.entries.chunked(3).forEach { categories ->
                 Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { categories.forEach { category ->
-                    FilterChip(selected=category in draft.stocks.categories,onClick={draft=draft.copy(stocks=draft.stocks.copy(categories=if(category in draft.stocks.categories) draft.stocks.categories-category else draft.stocks.categories+category))},label={Text(category.label,fontSize=10.sp)})
+                    FilterChip(enabled=LocalSettingsEnabled.current,selected=category in draft.stocks.categories,onClick={draft=draft.copy(stocks=draft.stocks.copy(categories=if(category in draft.stocks.categories) draft.stocks.categories-category else draft.stocks.categories+category))},label={Text(category.label,fontSize=10.sp)})
                 } }
             }
             Text("Default chart range",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { ChartRange.entries.forEach { range ->
-                FilterChip(selected=draft.stocks.range==range,onClick={draft=draft.copy(stocks=draft.stocks.copy(range=range))},label={Text(range.label,fontSize=11.sp)})
+                FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.stocks.range==range,onClick={draft=draft.copy(stocks=draft.stocks.copy(range=range))},label={Text(range.label,fontSize=11.sp)})
             } }
+            SettingToggle("Market wire on every screen",draft.persistentMarketTicker) {draft=draft.copy(persistentMarketTicker=it)}
             SettingToggle("Stock ticker",draft.stocks.tickerEnabled) {draft=draft.copy(stocks=draft.stocks.copy(tickerEnabled=it))}
-            SettingToggle("Rotate stock cards on each stock-screen visit",draft.stocks.rotate) {draft=draft.copy(stocks=draft.stocks.copy(rotate=it))}
+            SettingToggle("Hands-free stock pages and price history",draft.stocks.rotate) {draft=draft.copy(stocks=draft.stocks.copy(rotate=it))}
             Text("Stock refresh (provider limits may lengthen this)",color=Mint,fontSize=13.sp)
             Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { STOCK_REFRESH_INTERVALS.forEach { seconds ->
-                FilterChip(selected=draft.stocks.refreshSeconds==seconds,onClick={draft=draft.copy(stocks=draft.stocks.copy(refreshSeconds=seconds))},label={Text("${seconds/60}m",fontSize=11.sp)})
+                FilterChip(enabled=LocalSettingsEnabled.current,selected=draft.stocks.refreshSeconds==seconds,onClick={draft=draft.copy(stocks=draft.stocks.copy(refreshSeconds=seconds))},label={Text("${seconds/60}m",fontSize=11.sp)})
             } }
             Text("Closed or unknown sessions refresh every 15–30 minutes. Failed requests back off automatically.",color=Muted,fontSize=11.sp)
             MarketIndex.entries.forEach { index ->
                 SettingToggle(index.label,index in draft.stocks.indices) { checked -> draft=draft.copy(stocks=draft.stocks.copy(indices=if(checked) draft.stocks.indices+index else draft.stocks.indices-index)) }
             }
-            OutlinedTextField(value=proxy,onValueChange={proxy=it},label={Text("Market-data proxy HTTPS URL")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=proxy.isNotBlank() && !validStockProxy(proxy.trim()))
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=proxy,onValueChange={proxy=it},label={Text("Market-data proxy HTTPS URL")},singleLine=true,modifier=Modifier.fillMaxWidth(),isError=proxy.isNotBlank() && !validStockProxy(proxy.trim()))
             Text("Use your own proxy's HTTPS URL. Alpaca's API URL is an upstream service, not a proxy. Provider credentials stay on your server.",color=Muted,fontSize=11.sp)
+            OutlinedTextField(enabled=LocalSettingsEnabled.current,value=token,onValueChange={token=it; clearToken=false},
+                label={Text("Worker access token (not Alpaca keys)")},singleLine=true,
+                visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
+                modifier=Modifier.fillMaxWidth(),isError=!tokenValid)
+            Text(if(draft.stocks.accessTokenConfigured) "A protected token is saved. Leave blank to keep it for this URL. Changing the URL removes it unless you enter a replacement."
+                else "Enter the Worker's 64-character lowercase hexadecimal access token. Stocks will not connect without it. Weather and sports need no token.",color=Muted,fontSize=11.sp)
+            SettingToggle("Remove saved Worker access token",clearToken) { clearToken=it; if(it) token="" }
+            if(!tokenValid) Text("The Worker access token must be 64 lowercase hexadecimal characters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             if(!stocksValid) Text("Check the featured symbol, watchlist (maximum 500), and HTTPS URL without credentials or query parameters.",color=MaterialTheme.colorScheme.error,fontSize=11.sp)
             SettingToggle("Keep screen awake",draft.keepAwake) {draft=draft.copy(keepAwake=it)}
-        } },
-        confirmButton={TextButton(enabled=stocksValid,onClick={onSave(draft.copy(stocks=draft.stocks.copy(featured=featured,watchlist=parsedWatchlist,proxyUrl=proxy).normalized()));onDismiss()}) {Text("Save settings")}},
-        dismissButton={TextButton(onClick=onDismiss) {Text("Cancel")}})
+        } } },
+        confirmButton={TextButton(enabled=stocksValid && !state.settingsSaving,onClick={onSave(draft.copy(stocks=draft.stocks.copy(featured=featured,watchlist=parsedWatchlist,proxyUrl=proxy,accessTokenEdit=if(clearToken) ProxyTokenEdit("") else token.takeIf { it.isNotEmpty() }?.let(::ProxyTokenEdit)).normalized()))}) {Text(if(state.settingsSaving) "Saving…" else "Save settings")}},
+        dismissButton={TextButton(enabled=!state.settingsSaving,onClick=dismiss) {Text("Cancel")}})
 }
+private val LocalSettingsEnabled = staticCompositionLocalOf { true }
+
 @Composable private fun LeagueSelection(selected: Set<League>, onChange: (Set<League>) -> Unit) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { League.entries.forEach { league ->
         Column(horizontalAlignment=Alignment.CenterHorizontally) {
             Text(league.name,fontSize=10.sp)
-            Checkbox(checked=league in selected,onCheckedChange={ checked -> onChange(if(checked) selected+league else selected-league) })
+            Checkbox(enabled=LocalSettingsEnabled.current,checked=league in selected,onCheckedChange={ checked -> onChange(if(checked) selected+league else selected-league) })
         }
     } }
 }
 @Composable private fun SettingToggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-        Text(label,fontSize=13.sp,modifier=Modifier.weight(1f)); Switch(checked=checked,onCheckedChange=onChange)
+        Text(label,fontSize=13.sp,modifier=Modifier.weight(1f)); Switch(enabled=LocalSettingsEnabled.current,checked=checked,onCheckedChange=onChange)
     }
 }

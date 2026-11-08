@@ -38,14 +38,52 @@ object EspnParser {
             val mapped = status(type.str("name"), type.str("state"), type.bool("completed"))
             Game(id, league, team(away), team(home), away.int("score"), home.int("score"), mapped,
                 parsed(c.str("date") ?: e.str("date")) { OffsetDateTime.parse(it).toInstant() }, s.int("period"), s.str("displayClock"),
-                type.str("shortDetail") ?: type.str("detail") ?: type.str("description") ?: "Status unavailable")
+                type.str("shortDetail") ?: type.str("detail") ?: type.str("description") ?: "Status unavailable",
+                venue = c.obj("venue")?.text("fullName"),
+                broadcasts = broadcasts(c),
+                situation = if (mapped == GameStatus.LIVE) situation(c.obj("situation"), league) else null)
         }.distinctBy { it.id }
     }
+    // Optional provider metadata must never prevent the scoreboard from loading.
+    private fun JsonObject.text(key: String): String? =
+        (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }
+
     private fun team(c: JsonObject): Team {
         val t = c.obj("team") ?: JsonObject(emptyMap())
+        val records = c.arr("records").filterIsInstance<JsonObject>()
+        val overall = records.firstOrNull { it.str("type") == "total" || it.str("name") == "overall" }
         return Team(t.str("displayName") ?: t.str("name") ?: "Unknown team", t.str("abbreviation") ?: "—",
-            t.str("logo") ?: (t.arr("logos").firstOrNull() as? JsonObject)?.str("href"))
+            t.str("logo") ?: (t.arr("logos").firstOrNull() as? JsonObject)?.str("href"),
+            id = t.str("id") ?: c.str("id"), record = overall?.text("summary"),
+            // ESPN uses 99 for an unranked team.
+            rank = c.obj("curatedRank")?.int("current")?.takeIf { it in 1..25 })
     }
+
+    private fun broadcasts(c: JsonObject): List<String> {
+        val names = c.arr("broadcasts").filterIsInstance<JsonObject>().flatMap { it.arr("names") }
+            .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.trim()?.takeIf(String::isNotEmpty) }
+        val geo = c.arr("geoBroadcasts").filterIsInstance<JsonObject>()
+            .mapNotNull { it.obj("media")?.text("shortName") }
+        return (names + geo).distinct()
+    }
+
+    private fun situation(s: JsonObject?, league: League): GameSituation? {
+        if (s == null) return null
+        val football = league == League.NFL || league == League.NCAAF
+        val baseball = league == League.MLB
+        return GameSituation(
+            possessionTeamId = if (football) s.str("possession") else null,
+            downDistance = if (football) s.text("downDistanceText") ?: s.text("shortDownDistanceText") else null,
+            balls = if (baseball) s.int("balls")?.takeIf { it in 0..3 } else null,
+            strikes = if (baseball) s.int("strikes")?.takeIf { it in 0..2 } else null,
+            outs = if (baseball) s.int("outs")?.takeIf { it in 0..3 } else null,
+            onFirst = if (baseball) s.bool("onFirst") else null,
+            onSecond = if (baseball) s.bool("onSecond") else null,
+            onThird = if (baseball) s.bool("onThird") else null,
+            lastPlay = s.obj("lastPlay")?.text("text")
+        ).takeUnless { it == GameSituation() }
+    }
+
 }
 
 object WeatherParser {

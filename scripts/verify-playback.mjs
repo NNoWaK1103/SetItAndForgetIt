@@ -42,7 +42,7 @@ function isSelected(tree,node) {
 function tap(node) {const [x,y]=center(node);shell('input','tap',String(Math.round(x)),String(Math.round(y)));}
 async function tapText(label,{scroll=false}={}) {
   for(let attempt=0;attempt<(scroll?8:3);attempt++) {
-    const node=nodes().find(n=>n.text===label);
+    const node=nodes().find(n=>n.text===label || n['content-desc']===label);
     if(node) {tap(node);await pause(200);return;}
     if(scroll) shell('input','swipe','640','610','640','320','250');
     await pause(250);
@@ -55,15 +55,15 @@ async function assertScreen(label) {
   for(let attempt=0;attempt<3;attempt++) {
     const tree=nodes();
     if(screenPresent(tree,label)) {
-      const tab=tree.find(n=>n['content-desc']===`Show ${label} dashboard`);
-      assert.ok(tab && isSelected(tree,tab),`${label} tab must be selected`);
+      const labels=label==='Sports'?['NFL / College','NFL','College','NHL','MLB','NBA']:[label];
+      assert.ok(tree.some(n=>labels.includes(n.text) && isSelected(tree,n)),`${label} tab must be selected`);
       return;
     }
     await pause(300);
   }
   throw new Error(`${label} button did not display its dashboard`);
 }
-async function switchTo(label) {await tapText(label);await assertScreen(label);}
+async function switchTo(label) {await tapText(label==='Sports'?'NFL / College':label);await assertScreen(label);}
 async function setToggle(label,checked) {
   const tree=nodes(), caption=tree.find(n=>n.text===label);
   assert.ok(caption,`Missing switch label ${label}`);
@@ -72,7 +72,15 @@ async function setToggle(label,checked) {
   assert.ok(control,`Missing switch for ${label}`);
   if(control.checked!==String(checked)) {tap(control);await pause(200);}
 }
-async function openSettings() {await tapText('Settings');}
+async function openSettings() {await tapText('Scoreboard settings');}
+async function saveSettings() {
+  await tapText('Save settings');
+  for(let attempt=0;attempt<10;attempt++) {
+    if(!nodes().some(n=>n.text==='Make it yours')) return;
+    await pause(200);
+  }
+  throw new Error('Settings did not finish saving');
+}
 function startApp() {shell('am','start','-S','-W','-n','com.openticker.app/.MainActivity');}
 
 try {
@@ -89,7 +97,7 @@ try {
   shell('svc','wifi','disable');shell('svc','data','disable');
   startApp();await pause(1500);
   const welcome=nodes().find(n=>n.text?.toLowerCase()==='got it');if(welcome) tap(welcome);
-  if(nodes().some(n=>n.text==='Pause')) await tapText('Pause');
+  if(nodes().some(n=>n['content-desc']==='Pause automatic slideshow')) await tapText('Pause automatic slideshow');
   await openSettings();
   let defaults=nodes();
   for(let attempt=0;!defaults.some(n=>n.text==='15s') && attempt<5;attempt++) {
@@ -97,7 +105,7 @@ try {
   }
   assert.ok(defaults.some(n=>n.text==='15s' && isSelected(defaults,n)),'Fresh installs default to 15 seconds');
   await tapText('Cancel');await switchTo('Weather');
-  const cycleStarted=performance.now();await tapText('Resume');
+  const cycleStarted=performance.now();await tapText('Resume automatic slideshow');
   for(const [label,deadline] of [['Sports',15],['Stocks',30],['Weather',45]]) {
     while(true) {
       const tree=nodes(), elapsed=performance.now()-cycleStarted;
@@ -109,17 +117,27 @@ try {
       await pause(150);
     }
   }
-  await tapText('Pause');console.log('PASS default Weather / Sports / Stocks cycle at 15 seconds per screen');
+  await tapText('Pause automatic slideshow');console.log('PASS default Weather / Sports / Stocks cycle at 15 seconds per screen');
   for(const label of ['Stocks','Weather','Sports','Weather','Stocks','Sports']) {
     await switchTo(label);report.manualScreens.push(label);
     if(label==='Stocks') assert.ok(nodes().some(n=>n.text.startsWith('Stock data not configured')),'Unconfigured stocks display clear setup guidance');
     screenshot(label.toLowerCase());
     console.log(`PASS manual ${label} button`);
   }
+  // Cancel must discard an interval draft, including across a process restart.
+  await openSettings();await tapText('10s',{scroll:true});await tapText('Cancel');
+  shell('am','force-stop','com.openticker.app');startApp();await pause(500);
+  await openSettings();
+  let cancelled=nodes();
+  for(let attempt=0;!cancelled.some(n=>n.text==='15s') && attempt<5;attempt++) {
+    shell('input','swipe','640','610','640','320','250');cancelled=nodes();
+  }
+  assert.ok(cancelled.some(n=>n.text==='15s' && isSelected(cancelled,n)),'Cancel must preserve the saved 15s interval');
+  await tapText('Cancel');report.cancelDiscardsInterval=true;
   for(const seconds of [10,15,20]) {
     await openSettings();await tapText(`${seconds}s`,{scroll:true});
-    await tapText('Cancel');
-    // A chip tap must survive both Cancel and a process restart, without a full settings save.
+    await saveSettings();
+    // Only Save commits the draft, and the chosen interval must survive a process restart.
     shell('am','force-stop','com.openticker.app');startApp();await pause(500);
     await openSettings();
     let tree=nodes();
@@ -130,7 +148,7 @@ try {
     screenshot(`settings-${seconds}s`);await tapText('Cancel');
     await switchTo('Weather');
     // Resume after manual selection: the chosen screen must get the full configured dwell.
-    const resume=nodes().find(n=>n.text==='Resume');assert.ok(resume,'Playback remains paused while choosing an interval');
+    const resume=nodes().find(n=>n['content-desc']==='Resume automatic slideshow');assert.ok(resume,'Playback remains paused while choosing an interval');
     const started=performance.now();tap(resume);
     await pause(seconds*500);
     assert.ok(screenPresent(nodes(),'Weather'),`${seconds}s interval switched too early`);
@@ -143,11 +161,11 @@ try {
     assert.ok(elapsed>=(seconds-1)*1000,`${seconds}s interval advanced early`);
     report.intervals.push({seconds,observedSwitchMs:Math.round(elapsed),persistedAfterRestart:true});
     console.log(`PASS ${seconds}s interval, observed Sports at ${(elapsed/1000).toFixed(1)}s`);
-    await tapText('Pause');
+    await tapText('Pause automatic slideshow');
   }
   await openSettings();
   for(const label of ['Weather','Sports','Stocks']) await setToggle(label,false);
-  await tapText('Save settings');
+  await saveSettings();
   for(const label of ['Weather','Sports','Stocks']) {
     await switchTo(label);report.disabledScreens.push(label);
     console.log(`PASS manual ${label} with automatic screens disabled`);
@@ -156,7 +174,7 @@ try {
   await openSettings();
   for(const label of ['Weather','Sports','Stocks']) await setToggle(label,true);
   await setToggle('Pause automatic switching',false);
-  await tapText('15s',{scroll:true});await tapText('Save settings');
+  await tapText('15s',{scroll:true});await saveSettings();
   await switchTo('Weather');
   const logs=adb('logcat','-d','-v','threadtime').toString();
   assert.ok(!logs.includes('FATAL EXCEPTION'),'No Android runtime crashes during playback checks');

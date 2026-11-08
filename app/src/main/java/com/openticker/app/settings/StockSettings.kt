@@ -14,7 +14,10 @@ data class StockSettings(
     val refreshSeconds: Int = 60,
     val rotate: Boolean = true,
     val indices: Set<MarketIndex> = MarketIndex.entries.toSet(),
-    val proxyUrl: String = ""
+    val proxyUrl: String = "",
+    val accessTokenConfigured: Boolean = false,
+    val credentialRevision: Int = 0,
+    val accessTokenEdit: ProxyTokenEdit? = null
 ) {
     fun selectedSymbols(): List<String> = (listOf(featured) + watchlist.filter { stockCompany(it).category in categories }).distinct()
     // HD stays visible even if the user features a different stock.

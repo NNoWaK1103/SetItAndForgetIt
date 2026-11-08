@@ -11,8 +11,9 @@ android {
         applicationId = "com.openticker.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 11
+        versionName = "1.5.1"
+        manifestPlaceholders["appLabel"] = "OpenTicker"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
@@ -21,7 +22,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildTypes { release { isMinifyEnabled = false } }
+    buildTypes {
+        release { isMinifyEnabled = false }
+        create("dashboardPreview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".figmapreview"
+            versionNameSuffix = "-figma-preview"
+            matchingFallbacks += listOf("debug")
+            manifestPlaceholders["appLabel"] = "OpenTicker GUI Preview"
+        }
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.10.01"))

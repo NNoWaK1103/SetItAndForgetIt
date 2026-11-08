@@ -1,0 +1,3 @@
+package: name='com.openticker.app.dashboardpreview' versionCode='7' versionName='1.4.0-preview' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+application-label:'OpenTicker Preview'
+launchable-activity: name='com.openticker.app.MainActivity'  label='' icon=''

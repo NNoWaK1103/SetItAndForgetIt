@@ -14,15 +14,16 @@ interface StockDataSource {
 }
 
 /** Only calls an operator-configured HTTPS proxy. Provider credentials never enter the app. */
-class ProxyStockDataSource(private val get: suspend (okhttp3.HttpUrl) -> String) : StockDataSource {
-    constructor(http: HttpClient) : this(http::get)
+class ProxyStockDataSource private constructor(private val fetch: suspend (String, okhttp3.HttpUrl) -> String) : StockDataSource {
+    constructor(get: suspend (okhttp3.HttpUrl) -> String) : this({ _, url -> get(url) })
+    constructor(http: StockProxyHttpClient) : this(http::get)
     private fun url(base: String, path: String) = base.also { require(validStockProxy(it)) }
         .toHttpUrl().newBuilder().addPathSegments(path)
     override suspend fun snapshot(baseUrl: String, symbols: List<String>, indices: Set<MarketIndex>) = withContext(Dispatchers.IO) {
         require(symbols.isNotEmpty())
         // Bound each proxy request even when the user configures the full company watchlist.
         val snapshots = symbols.distinct().chunked(50).mapIndexed { index, batch ->
-            StockParser.snapshot(get(url(baseUrl, "v1/quotes")
+            StockParser.snapshot(fetch(baseUrl, url(baseUrl, "v1/quotes")
                 .addQueryParameter("symbols", batch.joinToString(","))
                 .addQueryParameter("indices", if(index==0) indices.joinToString(",") { it.symbol } else "").build()))
         }
@@ -35,7 +36,7 @@ class ProxyStockDataSource(private val get: suspend (okhttp3.HttpUrl) -> String)
             staleSymbols = snapshots.flatMap { it.staleSymbols }.toSet())
     }
     override suspend fun history(baseUrl: String, symbol: String, range: ChartRange) = withContext(Dispatchers.IO) {
-        StockParser.history(get(url(baseUrl, "v1/history").addQueryParameter("symbol", symbol)
+        StockParser.history(fetch(baseUrl, url(baseUrl, "v1/history").addQueryParameter("symbol", symbol)
             .addQueryParameter("range", range.label).build()))
     }
 }

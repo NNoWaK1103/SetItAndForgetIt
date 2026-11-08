@@ -18,7 +18,7 @@ class HttpClient {
             override fun onResponse(call: Call, response: Response) {
                 val result = runCatching { response.use {
                     if (!response.isSuccessful) {
-                        throw IOException("Provider returned HTTP ${response.code}")
+                        throw FeedHttpException(response.code)
                     } else {
                         response.body?.string() ?: throw IOException("Empty provider response")
                     }
