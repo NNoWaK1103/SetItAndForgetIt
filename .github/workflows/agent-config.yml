@@ -1,0 +1,32 @@
+name: Codex agent configuration
+on:
+  pull_request:
+    paths:
+      - AGENTS.md
+      - .codex/**
+      - .agents/**
+      - docs/AGENT_WORKFLOW.md
+      - scripts/verify-agent-config.py
+      - .github/workflows/agent-config.yml
+  push:
+    branches: [main]
+    paths:
+      - AGENTS.md
+      - .codex/**
+      - .agents/**
+      - docs/AGENT_WORKFLOW.md
+      - scripts/verify-agent-config.py
+      - .github/workflows/agent-config.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Validate Codex agent and skill metadata
+        run: python3 scripts/verify-agent-config.py
