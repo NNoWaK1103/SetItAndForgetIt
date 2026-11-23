@@ -17,7 +17,7 @@ Subagents inherit access/permissions from the parent; a TOML file alone cannot g
 ## Skill utilization verification
 
 1. From repository root, run `python3 scripts/verify-agent-config.py`. This checks present files, YAML frontmatter metadata and parseable TOML, **not runtime selection**.
-2. In Codex, inspect the skills list (`/skills` when available) and confirm the five skill names; restart/reload the session if files were added after launch.
+2. In Codex, inspect the skills list (`/skills` when available) and confirm the project skill names listed in `AGENTS.md`; restart/reload the session if files were added after launch.
 3. **Explicit activation smoke test:** ask `Use $systematic-debugging to investigate a hypothetical stale HD quote. Do not edit any files; summarize the investigation steps.` Check the activity trace to verify Codex opened the corresponding SKILL.md and followed its procedure.
 4. **Natural activation smoke test:** without naming the skill, ask `A quoted HD price is stale while the Worker returns 200. Investigate the likely failure path without modifying code.` Verify the debugger selects systematic-debugging on its own. Compare against the explicit test.
 5. **Negative trigger test:** ask `Fix a spelling mistake in README.md only; do not modify anything else.` Verify it does **not** launch an elaborate brainstorming/planning process.
@@ -27,7 +27,7 @@ Subagents inherit access/permissions from the parent; a TOML file alone cannot g
 
 ### Evaluation rubric
 
-- **Configured:** project TOML parses, five skills have names/descriptions, Codex discovers them.
+- **Configured:** project TOML parses, all project skills have names/descriptions, Codex discovers them.
 - **Triggered:** Codex explicitly reads the appropriate SKILL.md (check trace, not self-report).
 - **Applied:** output/actions follow the skill's steps and produce concrete evidence.
 - **Effective:** required tests/review find or prevent regressions; CI passes. This requires task-specific evaluation.

@@ -6,7 +6,10 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ("architect-planner", "developer-debugger", "independent-reviewer")
-SKILLS = ("brainstorming", "code-review", "run-the-tests", "systematic-debugging", "writing-plans")
+SKILLS = (
+    "brainstorming", "code-review", "run-the-tests", "systematic-debugging", "writing-plans",
+    "android-apk-handoff", "market-data-verification", "tablet-ui-review",
+)
 
 
 def verify():

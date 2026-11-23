@@ -1,0 +1,47 @@
+{
+  "name": "openticker-android-tools",
+  "interface": {
+    "displayName": "OpenTicker Android tools"
+  },
+  "plugins": [
+    {
+      "name": "android-skills",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/android/skills.git",
+        "sha": "7f7b21730a605d112ca9f79b6e40105ce7b670ee"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "superpowers",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/obra/superpowers.git",
+        "sha": "22f0b463e7a5e579904dd6211a520321035526f7"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "firebase",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/firebase/agent-skills.git",
+        "sha": "99954a30898bb5ddc8152ee10e124dc3b4106bf7"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

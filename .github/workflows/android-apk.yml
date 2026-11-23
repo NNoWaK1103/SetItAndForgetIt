@@ -66,3 +66,50 @@ jobs:
           retention-days: 90
       - name: Record APK checksum
         run: sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/dashboardPreview/app-dashboardPreview.apk >> "$GITHUB_STEP_SUMMARY"
+
+  maestro-tablet:
+    name: Maestro offline tablet
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: OpenTicker-gui-preview-apk
+          path: smoke-apk
+      - name: Install Maestro CLI 2.12.1
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 --output maestro.zip https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.1/maestro.zip
+          echo '54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7  maestro.zip' | sha256sum --check
+          unzip -q maestro.zip
+          chmod +x maestro/bin/maestro
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_c
+          target: google_apis
+          disable-animations: true
+          script: ANDROID_SERIAL=emulator-5554 bash .github/scripts/maestro-offline-smoke.sh smoke-apk/app-dashboardPreview.apk .maestro/stock-dashboard.yaml
+      - name: Upload device evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: OpenTicker-maestro-tablet
+          path: build/maestro/
+          if-no-files-found: warn
+          retention-days: 14

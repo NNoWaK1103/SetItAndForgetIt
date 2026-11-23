@@ -1,0 +1,19 @@
+appId: com.openticker.app.figmapreview
+name: Open the unpaired stock dashboard on a landscape tablet
+---
+- launchApp
+- setOrientation: LANDSCAPE_LEFT
+- tapOn:
+    text: "(?i)got it"
+    optional: true
+- tapOn:
+    text: "Pause automatic slideshow"
+    optional: true
+- tapOn: "Stocks"
+- assertVisible: "Market Dashboard"
+- assertVisible: "Stock data not configured.*"
+- takeScreenshot: unpaired-market
+- tapOn: "Scoreboard settings"
+- assertVisible: "Make it yours"
+- tapOn: "Cancel"
+- assertVisible: "Market Dashboard"
