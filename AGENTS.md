@@ -11,6 +11,12 @@ The main Codex session coordinates work. Use project agents when delegation mate
 
 Select skills by actual task need, or explicitly via `$skill-name`; inspect their SKILL.md before following them. Do not claim a skill was loaded without an execution trace showing it was read. Never treat writing or listing a skill as proof it ran. For anything beyond trivial documentation changes, include a brief record of selected skills, tests and outcomes in the PR.
 
+Use [android-apk-handoff](.agents/skills/android-apk-handoff/SKILL.md) for installable builds, [tablet-ui-review](.agents/skills/tablet-ui-review/SKILL.md) for native layout or Figma changes, and [market-data-verification](.agents/skills/market-data-verification/SKILL.md) for quote/history validation. Prefer the project versions of the five existing workflow skills when both they and Superpowers apply.
+
+Trusted local Codex checkouts can load pinned Google Android Skills and Superpowers from the project marketplace. Use the existing GitHub integration for Actions and draft PRs, and Figma with the exact reference frame for design work. Firebase is optional for developer access to an existing Firebase project. Maestro MCP requires the host's `maestro` executable. To repeat the CI market UI check locally, use a disposable landscape emulator with a fresh, unpaired GUI preview APK and run `maestro test .maestro/stock-dashboard.yaml`.
+
+If the project catalog is missing in a local Codex client, run `codex plugin marketplace add .` from the checkout, then `codex plugin list --marketplace openticker-android-tools --available --json`. The three entries are `android-skills`, `superpowers` and the optional `firebase`.
+
 ## Non-negotiable project invariants
 
 - Preserve working stock, sports, weather, slideshow, data persistence, and both Android app build variants. Keep the standard `com.openticker.app` package and isolated preview package distinct.

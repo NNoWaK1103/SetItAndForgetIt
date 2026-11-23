@@ -1,0 +1,11 @@
+[plugins."android-skills@openticker-android-tools"]
+enabled = true
+
+[plugins."superpowers@openticker-android-tools"]
+enabled = true
+
+# Maestro CLI on the development host provides the MCP server.
+[mcp_servers.maestro]
+command = "maestro"
+args = ["mcp"]
+required = false
