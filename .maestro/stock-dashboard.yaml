@@ -2,15 +2,11 @@ appId: com.openticker.app.figmapreview
 name: Open the unpaired stock dashboard on a landscape tablet
 ---
 - launchApp
-- tapOn:
-    text: "(?i)got it"
-    optional: true
-- tapOn:
-    text: "Pause automatic slideshow"
-    optional: true
+- tapOn: "Pause automatic slideshow"
+- assertVisible: "Resume automatic slideshow"
 - tapOn: "Stocks"
 - assertVisible: "Market Dashboard"
-- assertVisible: "Stock data not configured.*"
+- assertVisible: 'Stock data not configured\. Add your HTTPS market-data proxy in Settings\.'
 - takeScreenshot: unpaired-market
 - tapOn: "Scoreboard settings"
 - assertVisible: "Make it yours"

@@ -8,6 +8,11 @@ serial=${ANDROID_SERIAL:?An explicit CI emulator serial is required}
 [[ ${GITHUB_ACTIONS:-} == true && $serial =~ ^emulator-[0-9]+$ ]]
 adb_device=(adb -s "$serial")
 [[ "$("${adb_device[@]}" shell getprop ro.kernel.qemu | tr -d '\r')" == 1 ]]
+# Set up the disposable tablet before first launch. System UI can otherwise cover header taps.
+"${adb_device[@]}" shell settings put secure immersive_mode_confirmations confirmed
+"${adb_device[@]}" shell wm size 1280x800
+"${adb_device[@]}" shell wm density 160
+
 # Choose the rotation relative to the AVD's natural display dimensions.
 size=$("${adb_device[@]}" shell wm size | tr -d '\r' | awk '/size:/ {size=$NF} END {print size}')
 [[ $size =~ ^([0-9]+)x([0-9]+)$ ]]
