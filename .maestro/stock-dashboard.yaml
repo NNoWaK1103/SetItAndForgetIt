@@ -2,7 +2,6 @@ appId: com.openticker.app.figmapreview
 name: Open the unpaired stock dashboard on a landscape tablet
 ---
 - launchApp
-- setOrientation: LANDSCAPE_LEFT
 - tapOn:
     text: "(?i)got it"
     optional: true

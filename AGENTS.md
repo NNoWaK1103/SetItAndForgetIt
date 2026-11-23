@@ -15,6 +15,8 @@ Use [android-apk-handoff](.agents/skills/android-apk-handoff/SKILL.md) for insta
 
 Trusted local Codex checkouts can load pinned Google Android Skills and Superpowers from the project marketplace. Use the existing GitHub integration for Actions and draft PRs, and Figma with the exact reference frame for design work. Firebase is optional for developer access to an existing Firebase project. Maestro MCP requires the host's `maestro` executable. To repeat the CI market UI check locally, use a disposable landscape emulator with a fresh, unpaired GUI preview APK and run `maestro test .maestro/stock-dashboard.yaml`.
 
+If the project catalog is missing in a local Codex client, run `codex plugin marketplace add .` from the checkout, then `codex plugin list --marketplace openticker-android-tools --available --json`. The three entries are `android-skills`, `superpowers` and the optional `firebase`.
+
 ## Non-negotiable project invariants
 
 - Preserve working stock, sports, weather, slideshow, data persistence, and both Android app build variants. Keep the standard `com.openticker.app` package and isolated preview package distinct.
